@@ -127,6 +127,18 @@
     z-index: 50;
     display: none;
   }
+  #sceneC-frame-top,
+  #sceneC-frame-bottom {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: #ff1500;
+    z-index: 20;
+    pointer-events: none;
+  }
+  #sceneC-frame-top { top: 0; }
+  #sceneC-frame-bottom { bottom: 0; }
 </style>
 </head>
 <body>
@@ -149,6 +161,8 @@
   <canvas id="sceneC-dotCanvas"></canvas>
   <div id="sceneC-annLayer"></div>
   <div id="sceneC-gazeDot"></div>
+  <div id="sceneC-frame-top"></div>
+  <div id="sceneC-frame-bottom"></div>
 </div>
 
 <script>
@@ -834,17 +848,23 @@
 
         if (!videoEl || videoW === 0) return;
 
-        // CONTAIN scale — הווידאו מוצג בשלמותו, ממורכז, על רקע לבן
-        const cR = p.width / p.height;
+        // מצמצמים את התיבה שהווידאו מתאים אליה אנכית, כדי שתמיד
+        // יישאר רקע לבן גלוי גם למעלה וגם למטה - לא רק כשהיחסים לא תואמים.
+        const VERTICAL_MARGIN_FRAC = 0.12; // 12% שוליים מכל צד = 24% בסה"כ
+        const boxH = p.height * (1 - VERTICAL_MARGIN_FRAC * 2);
+        const boxY = p.height * VERTICAL_MARGIN_FRAC;
+
+        // CONTAIN scale בתוך התיבה המצומצמת
+        const cR = p.width / boxH;
         const vR = videoW  / videoH;
         let dW, dH, oX, oY;
 
         if (vR > cR) {
           dW = p.width; dH = dW / vR;
-          oX = 0; oY = (p.height - dH) / 2;
+          oX = 0; oY = boxY + (boxH - dH) / 2;
         } else {
-          dH = p.height; dW = vR * dH;
-          oX = (p.width - dW) / 2; oY = 0;
+          dH = boxH; dW = vR * dH;
+          oX = (p.width - dW) / 2; oY = boxY;
         }
 
         p.image(vid, oX, oY, dW, dH);
