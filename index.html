@@ -6,16 +6,16 @@
   html, body {
     margin: 0;
     padding: 0;
-    width: 1920px;
-    height: 1080px;
+    width: 2560px;
+    height: 1280px;
     background: #c8e8f5;
     overflow: hidden;
   }
 
   #stage {
     position: relative;
-    width: 1920px;
-    height: 1080px;
+    width: 2560px;
+    height: 1280px;
     overflow: hidden;
   }
 
@@ -36,9 +36,9 @@
     z-index: 1;
     pointer-events: none;
     background-image:
-      linear-gradient(to right, rgba(255,0,0,0.6) 0.5px, transparent 0.5px),
-      linear-gradient(to bottom, rgba(255,0,0,0.6) 0.5px, transparent 0.5px);
-    background-size: calc(1080px / 6) calc(1080px / 6);
+      linear-gradient(to right, rgba(255,0,0,0.14) 0.5px, transparent 0.5px),
+      linear-gradient(to bottom, rgba(255,0,0,0.14) 0.5px, transparent 0.5px);
+    background-size: calc(1280px / 6) calc(1280px / 6);
     background-position: 50% 50%;
     background-repeat: repeat;
   }
@@ -50,6 +50,7 @@
     z-index: 2;
     pointer-events: none;
   }
+
   .dot {
     position: absolute;
     left: var(--x);
@@ -63,6 +64,7 @@
     animation: dotPulse var(--dur, 3.4s) ease-in-out infinite;
     animation-delay: var(--delay, 0s);
   }
+
   @keyframes dotPulse {
     0%   { opacity: 0; }
     18%  { opacity: 0; }
@@ -77,30 +79,34 @@
 
 <div id="stage">
   <video id="bgVideo" autoplay muted loop playsinline>
-    <source src="sky.mp4" type="video/mp4">
+    <source src="https://video.wixstatic.com/video/cd7757_4dda56ebc7d24d2788c3ff92061c591d/720p/mp4/file.mp4" type="video/mp4">
   </video>
 
+  <script>
+    // האטת הווידאו ב-25% ממהירות הנגינה הרגילה
+    (function () {
+      var vid = document.getElementById('bgVideo');
+      function slowDown() { vid.playbackRate = 0.6; }
+      slowDown();
+      vid.addEventListener('loadedmetadata', slowDown);
+      vid.addEventListener('play', slowDown);
+    })();
+  </script>
+
   <div id="gridOverlay"></div>
+
   <div id="dotsLayer"></div>
 </div>
 
 <script>
-  // האטת הווידאו ב-40% (מהירות 60% מהמקור)
-  (function () {
-    var vid = document.getElementById('bgVideo');
-    function slowDown() { vid.playbackRate = 0.6; }
-    slowDown();
-    vid.addEventListener('loadedmetadata', slowDown);
-    vid.addEventListener('play', slowDown);
-  })();
-
   // ── יצירת שדה נקודות אדומות קטנות במיקומים אקראיים ──
-  var DOT_COUNT = 40;                 // כמות הנקודות - אפשר לשנות
+  var DOT_COUNT = 40;           // כמות הנקודות - אפשר לשנות
   var MIN_DUR = 2.5, MAX_DUR = 5.5;   // טווח משך האנימציה (שניות)
-  var MAX_DELAY = 5;                  // עיכוב מקסימלי לפני שכל נקודה מתחילה (שניות)
+  var MAX_DELAY = 5;             // עיכוב מקסימלי לפני שכל נקודה מתחילה (שניות)
 
   var layer = document.getElementById('dotsLayer');
   var frag = document.createDocumentFragment();
+
   for (var i = 0; i < DOT_COUNT; i++) {
     var dot = document.createElement('span');
     dot.className = 'dot';
