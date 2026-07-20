@@ -127,18 +127,6 @@
     z-index: 50;
     display: none;
   }
-  #sceneC-frame-top,
-  #sceneC-frame-bottom {
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: #ff1500;
-    z-index: 20;
-    pointer-events: none;
-  }
-  #sceneC-frame-top { top: 0; }
-  #sceneC-frame-bottom { bottom: 0; }
 </style>
 </head>
 <body>
@@ -161,8 +149,6 @@
   <canvas id="sceneC-dotCanvas"></canvas>
   <div id="sceneC-annLayer"></div>
   <div id="sceneC-gazeDot"></div>
-  <div id="sceneC-frame-top"></div>
-  <div id="sceneC-frame-bottom"></div>
 </div>
 
 <script>
