@@ -2,24 +2,35 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
 <style>
   html, body {
     margin: 0;
     padding: 0;
-    width: 1920px;
-    height: 1080px;
-    background: #c8e8f5;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
+    background: #000;
   }
 
-  #stage {
+  .scene {
+    display: none;
+    position: fixed;
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+  }
+  .scene.active { display: flex; }
+
+  /* ── SCENE A: video + dots ── */
+  #sceneA-stage {
     position: relative;
     width: 1920px;
     height: 1080px;
     overflow: hidden;
+    background: #c8e8f5;
   }
 
-  /* ── רקע הוידאו ── */
   #bgVideo {
     position: absolute;
     inset: 0;
@@ -29,7 +40,6 @@
     z-index: 0;
   }
 
-  /* ── שכבת הנקודות האדומות ── */
   #dotsLayer {
     position: absolute;
     inset: 0;
@@ -59,52 +69,382 @@
     80%  { opacity: 0; }
     100% { opacity: 0; }
   }
+
+  /* ── SCENE B: p5 video edge-analysis ── */
+  #sceneB {
+    background: #ffffff;
+  }
+  #sceneB canvas {
+    display: block;
+  }
 </style>
 </head>
 <body>
 
-<div id="stage">
-  <video id="bgVideo" autoplay muted loop playsinline>
-    <source src="sky.mp4" type="video/mp4">
-  </video>
-
-  <script>
-    // האטת הווידאו ב-40% (מהירות 60% מהמקור)
-    (function () {
-      var vid = document.getElementById('bgVideo');
-      function slowDown() { vid.playbackRate = 0.6; }
-      slowDown();
-      vid.addEventListener('loadedmetadata', slowDown);
-      vid.addEventListener('play', slowDown);
-    })();
-  </script>
-
-  <div id="dotsLayer"></div>
+<!-- SCENE A -->
+<div id="sceneA" class="scene active">
+  <div id="sceneA-stage">
+    <video id="bgVideo" autoplay muted loop playsinline>
+      <source src="sky.mp4" type="video/mp4">
+    </video>
+    <div id="dotsLayer"></div>
+  </div>
 </div>
 
+<!-- SCENE B -->
+<div id="sceneB" class="scene"></div>
+
 <script>
-  // ── יצירת שדה נקודות אדומות קטנות במיקומים אקראיים ──
-  var DOT_COUNT = 70;           // כמות הנקודות - אפשר לשנות
-  var MIN_DUR = 2.5, MAX_DUR = 5.5;   // טווח משך האנימציה (שניות)
-  var MAX_DELAY = 5;             // עיכוב מקסימלי לפני שכל נקודה מתחילה (שניות)
+  // ═══════════════════════════════════════════════════════════════
+  // SCENE A — video + red grid dots
+  // ═══════════════════════════════════════════════════════════════
+  (function () {
+    var vid = document.getElementById('bgVideo');
+    function slowDown() { vid.playbackRate = 0.6; }
+    slowDown();
+    vid.addEventListener('loadedmetadata', slowDown);
+    vid.addEventListener('play', slowDown);
 
-  var layer = document.getElementById('dotsLayer');
-  var frag = document.createDocumentFragment();
+    var DOT_COUNT = 70;
+    var MIN_DUR = 2.5, MAX_DUR = 5.5;
+    var MAX_DELAY = 5;
 
-  for (var i = 0; i < DOT_COUNT; i++) {
-    var dot = document.createElement('span');
-    dot.className = 'dot';
-    var x = (Math.random() * 100).toFixed(2) + '%';
-    var y = (Math.random() * 100).toFixed(2) + '%';
-    var delay = (Math.random() * MAX_DELAY).toFixed(2) + 's';
-    var dur = (MIN_DUR + Math.random() * (MAX_DUR - MIN_DUR)).toFixed(2) + 's';
-    dot.style.setProperty('--x', x);
-    dot.style.setProperty('--y', y);
-    dot.style.setProperty('--delay', delay);
-    dot.style.setProperty('--dur', dur);
-    frag.appendChild(dot);
-  }
-  layer.appendChild(frag);
+    var layer = document.getElementById('dotsLayer');
+    var frag = document.createDocumentFragment();
+
+    for (var i = 0; i < DOT_COUNT; i++) {
+      var dot = document.createElement('span');
+      dot.className = 'dot';
+      var x = (Math.random() * 100).toFixed(2) + '%';
+      var y = (Math.random() * 100).toFixed(2) + '%';
+      var delay = (Math.random() * MAX_DELAY).toFixed(2) + 's';
+      var dur = (MIN_DUR + Math.random() * (MAX_DUR - MIN_DUR)).toFixed(2) + 's';
+      dot.style.setProperty('--x', x);
+      dot.style.setProperty('--y', y);
+      dot.style.setProperty('--delay', delay);
+      dot.style.setProperty('--dur', dur);
+      frag.appendChild(dot);
+    }
+    layer.appendChild(frag);
+  })();
+
+  // ═══════════════════════════════════════════════════════════════
+  // SCENE B — p5.js video edge-detection analysis (instance mode)
+  // ═══════════════════════════════════════════════════════════════
+  new p5(function (p) {
+
+    let video;
+    let previousFrame;
+
+    let analyzedData = {};
+    let edgeTexts = [];
+
+    let videoW = 1;
+    let videoH = 1;
+
+    const FINAL_CANVAS_WIDTH = 270;
+    const FINAL_CANVAS_HEIGHT = 480;
+
+    p.preload = function () {
+      video = p.createVideo(['CCCC.mp4']);
+    };
+
+    p.setup = function () {
+      const cnv = p.createCanvas(FINAL_CANVAS_WIDTH, FINAL_CANVAS_HEIGHT);
+      cnv.parent('sceneB');
+
+      video.hide();
+      video.volume(0);
+      video.loop();
+
+      video.elt.onloadeddata = () => {
+        videoW = video.width;
+        videoH = video.height;
+        previousFrame = p.createGraphics(videoW, videoH);
+        console.log('VIDEO READY');
+      };
+
+      analyzedData = {
+        timestamp: '0.000',
+        edges: 0,
+        shapes: { circles: 0, lines: 0, corners: 0, curves: 0 },
+        motion: { intensity: 0, direction: 'סטטי', rotationSpeed: 0, stability: 100 },
+        composition: { brightness: 0, contrast: 'נמוך', balance: 'מאוזן', saturation: 0 },
+        cameraAngle: 'ישירה'
+      };
+    };
+
+    p.draw = function () {
+      // רקע לבן במקום שחור
+      p.background(255);
+
+      if (!video || videoW === 0 || videoH === 0) return;
+
+      // ── CONTAIN SCALE — הווידאו מוצג באמצע, בשלמותו, בלי חיתוך ──
+      let canvasRatio = p.width / p.height;
+      let videoRatio = videoW / videoH;
+
+      let drawW, drawH, offsetX, offsetY;
+
+      if (videoRatio > canvasRatio) {
+        drawW = p.width;
+        drawH = drawW / videoRatio;
+        offsetX = 0;
+        offsetY = (p.height - drawH) / 2;
+      } else {
+        drawH = p.height;
+        drawW = videoRatio * drawH;
+        offsetX = (p.width - drawW) / 2;
+        offsetY = 0;
+      }
+
+      p.image(video, offsetX, offsetY, drawW, drawH);
+
+      analyzeFrame(offsetX, offsetY, drawW, drawH);
+
+      for (let edge of edgeTexts) {
+        p.fill(255, 0, 0);
+        p.noStroke();
+        p.textSize(6);
+        p.textAlign(p.CENTER, p.CENTER);
+        p.text(edge.text, edge.sx, edge.sy);
+      }
+    };
+
+    function analyzeFrame(offsetX, offsetY, drawW, drawH) {
+      video.loadPixels();
+      if (video.pixels.length === 0) return;
+
+      edgeTexts = [];
+
+      let edges = detectEdges(offsetX, offsetY, drawW, drawH);
+      let shapes = detectShapes(edges);
+      let motion = analyzeMotion();
+      let composition = analyzeComposition();
+      let cameraAngle = detectCameraAngle(edges);
+
+      analyzedData = {
+        timestamp: video.time().toFixed(3),
+        edges: edges.length,
+        shapes,
+        motion,
+        composition,
+        cameraAngle
+      };
+
+      sampleAndLabelStrongEdges(edges, offsetX, offsetY, drawW, drawH);
+    }
+
+    function sampleAndLabelStrongEdges(edges, offsetX, offsetY, drawW, drawH) {
+      const strongEdgeThreshold = 110;
+      let sampleCount = 0;
+      const sampleRate = 50;
+
+      let composition_contrast_en = 'LOW';
+      if (analyzedData.composition.contrast === 'גבוה') composition_contrast_en = 'HIGH';
+      else if (analyzedData.composition.contrast === 'בינוני') composition_contrast_en = 'MEDIUM';
+
+      let motion_direction_en = 'STATIC';
+      if (analyzedData.motion.direction === 'מהירה') motion_direction_en = 'FAST';
+      else if (analyzedData.motion.direction === 'איטית') motion_direction_en = 'SLOW';
+
+      for (let i = 0; i < edges.length; i++) {
+        let edge = edges[i];
+        if (edge.mag > strongEdgeThreshold) {
+          if (sampleCount % sampleRate === 0) {
+            let gx = edge.gx;
+            let gy = edge.gy;
+            let angle = p.atan2(gy, gx);
+            let angleDeg = p.degrees(angle);
+
+            let sx = offsetX + p.map(edge.x, 0, videoW, 0, drawW);
+            let sy = offsetY + p.map(edge.y, 0, videoH, 0, drawH);
+
+            let label;
+            let isVertical = angleDeg > 45 && angleDeg < 135;
+            let isHorizontal =
+              angleDeg < 20 || angleDeg > 160 ||
+              (angleDeg < 0 && angleDeg > -20) ||
+              (angleDeg < -160);
+
+            if (isVertical) {
+              label = `VERTICAL / CONTRAST ${composition_contrast_en}`;
+            } else if (isHorizontal) {
+              label = `HORIZONTAL / STAB ${analyzedData.motion.stability.toFixed(0)}%`;
+            } else if (edge.mag > 150) {
+              label = `CRITICAL / MOTION ${motion_direction_en}`;
+            } else {
+              label = `DETAIL / BRIGHT ${analyzedData.composition.brightness}`;
+            }
+
+            edgeTexts.push({ sx, sy, text: label.toUpperCase() });
+          }
+          sampleCount++;
+        }
+      }
+    }
+
+    function detectEdges(offsetX, offsetY, drawW, drawH) {
+      let edges = [];
+      let threshold = 200;
+      let step = 4;
+
+      for (let y = step; y < videoH - step; y += step) {
+        for (let x = step; x < videoW - step; x += step) {
+          let gx =
+            -1 * getPixelBrightness(x - step, y - step) +
+             1 * getPixelBrightness(x + step, y - step) +
+            -2 * getPixelBrightness(x - step, y) +
+             2 * getPixelBrightness(x + step, y) +
+            -1 * getPixelBrightness(x - step, y + step) +
+             1 * getPixelBrightness(x + step, y + step);
+
+          let gy =
+            -1 * getPixelBrightness(x - step, y - step) +
+            -2 * getPixelBrightness(x, y - step) +
+            -1 * getPixelBrightness(x + step, y - step) +
+             1 * getPixelBrightness(x - step, y + step) +
+             2 * getPixelBrightness(x, y + step) +
+             1 * getPixelBrightness(x + step, y + step);
+
+          let magnitude = p.sqrt(gx * gx + gy * gy);
+
+          if (magnitude > threshold) {
+            edges.push({ x, y, mag: magnitude, gx, gy });
+            drawEdgePoint(x, y, offsetX, offsetY, drawW, drawH);
+          }
+        }
+      }
+      return edges;
+    }
+
+    function drawEdgePoint(x, y, offsetX, offsetY, drawW, drawH) {
+      let sx = offsetX + p.map(x, 0, videoW, 0, drawW);
+      let sy = offsetY + p.map(y, 0, videoH, 0, drawH);
+      p.stroke(255, 0, 0, 120);
+      p.strokeWeight(1);
+      p.point(sx, sy);
+    }
+
+    function getPixelBrightness(x, y) {
+      if (x < 0 || x >= videoW || y < 0 || y >= videoH) return 0;
+      let idx = (p.floor(y) * videoW + p.floor(x)) * 4;
+      return (video.pixels[idx] + video.pixels[idx + 1] + video.pixels[idx + 2]) / 3;
+    }
+
+    function detectShapes(edges) {
+      let shapes = { circles: 0, lines: 0, corners: 0, curves: 0 };
+      shapes.lines = p.floor(edges.length / 300);
+      shapes.circles = p.floor(edges.length / 500);
+      shapes.corners = p.floor(edges.length / 200);
+      shapes.curves = p.floor(edges.length / 400);
+      return shapes;
+    }
+
+    function analyzeMotion() {
+      let motion = { intensity: 0, direction: 'סטטי', rotationSpeed: 0, stability: 100 };
+      if (!previousFrame) return motion;
+
+      previousFrame.loadPixels();
+
+      let totalDiff = 0;
+      let sampledPixels = 0;
+      let step = 10;
+
+      for (let y = 0; y < videoH; y += step) {
+        for (let x = 0; x < videoW; x += step) {
+          let idx = (y * videoW + x) * 4;
+
+          let currentBrightness =
+            (video.pixels[idx] + video.pixels[idx + 1] + video.pixels[idx + 2]) / 3;
+
+          let prevBrightness =
+            (previousFrame.pixels[idx] + previousFrame.pixels[idx + 1] + previousFrame.pixels[idx + 2]) / 3;
+
+          totalDiff += p.abs(currentBrightness - prevBrightness);
+          sampledPixels++;
+        }
+      }
+
+      if (sampledPixels > 0) {
+        let avgDiff = totalDiff / sampledPixels;
+
+        motion.intensity = p.constrain(avgDiff * 2, 0, 100);
+        motion.rotationSpeed = (avgDiff / 10).toFixed(1);
+        motion.stability = p.constrain(100 - avgDiff * 2, 0, 100);
+
+        if (avgDiff > 20) motion.direction = 'מהירה';
+        else if (avgDiff > 5) motion.direction = 'איטית';
+        else motion.direction = 'סטטי';
+      }
+
+      previousFrame.image(video, 0, 0);
+      return motion;
+    }
+
+    function analyzeComposition() {
+      let brightness = 0;
+      let saturation = 0;
+      let sampled = 0;
+      let step = 20;
+
+      for (let y = 0; y < videoH; y += step) {
+        for (let x = 0; x < videoW; x += step) {
+          let idx = (y * videoW + x) * 4;
+          let r = video.pixels[idx];
+          let g = video.pixels[idx + 1];
+          let b = video.pixels[idx + 2];
+
+          brightness += (r + g + b) / 3;
+          saturation += p.max(r, g, b) - p.min(r, g, b);
+          sampled++;
+        }
+      }
+
+      let avgBrightness = brightness / sampled;
+      let avgSaturation = saturation / sampled;
+
+      return {
+        brightness: p.floor(avgBrightness),
+        contrast: avgBrightness > 150 ? 'גבוה' : avgBrightness > 90 ? 'בינוני' : 'נמוך',
+        balance: 'מאוזן',
+        saturation: p.floor(avgSaturation)
+      };
+    }
+
+    function detectCameraAngle(edges) {
+      if (edges.length === 0) return 'ישירה';
+
+      let vertical = 0;
+      let horizontal = 0;
+
+      for (let i = 0; i < edges.length; i++) {
+        let e = edges[i];
+        if (p.abs(e.gx) < 5 && p.abs(e.gy) > 20) vertical++;
+        if (p.abs(e.gy) < 5 && p.abs(e.gx) > 20) horizontal++;
+      }
+
+      if (vertical > horizontal * 1.5) return 'מצלמה אנכית';
+      if (horizontal > vertical * 1.5) return 'מצלמה אופקית';
+      return 'ישירה';
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // SCENE SWITCHING — לחיצה על רווח עוברת לאנימציה הבאה
+  // ═══════════════════════════════════════════════════════════════
+  (function () {
+    var scenes = [document.getElementById('sceneA'), document.getElementById('sceneB')];
+    var current = 0;
+
+    document.addEventListener('keydown', function (e) {
+      if (e.code !== 'Space') return;
+      e.preventDefault();
+      scenes[current].classList.remove('active');
+      current = (current + 1) % scenes.length;
+      scenes[current].classList.add('active');
+    });
+  })();
 </script>
 
 </body>
