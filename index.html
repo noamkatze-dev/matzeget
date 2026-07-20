@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 2560px;
+    height: 1280px;
+    background: #c8e8f5;
+    overflow: hidden;
+  }
+
+  #stage {
+    position: relative;
+    width: 2560px;
+    height: 1280px;
+    overflow: hidden;
+  }
+
+  /* ── רקע הוידאו ── */
+  #bgVideo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+  }
+
+  /* ── שכבת גריד אדום דק, תאים בגודל height/6 ── */
+  #gridOverlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, rgba(255,0,0,0.14) 0.5px, transparent 0.5px),
+      linear-gradient(to bottom, rgba(255,0,0,0.14) 0.5px, transparent 0.5px);
+    background-size: calc(1280px / 6) calc(1280px / 6);
+    background-position: 50% 50%;
+    background-repeat: repeat;
+  }
+
+  /* ── שכבת הנקודות האדומות ── */
+  #dotsLayer {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .dot {
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    border-radius: 50%;
+    background: #FF0000;
+    opacity: 0;
+    animation: dotPulse var(--dur, 3.4s) ease-in-out infinite;
+    animation-delay: var(--delay, 0s);
+  }
+  @keyframes dotPulse {
+    0%   { opacity: 0; }
+    18%  { opacity: 0; }
+    20%  { opacity: 1; }
+    55%  { opacity: 1; }
+    80%  { opacity: 0; }
+    100% { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <video id="bgVideo" autoplay muted loop playsinline>
+    <source src="sky.mp4" type="video/mp4">
+  </video>
+
+  <div id="gridOverlay"></div>
+  <div id="dotsLayer"></div>
+</div>
+
+<script>
+  // האטת הווידאו ב-40% (מהירות 60% מהמקור)
+  (function () {
+    var vid = document.getElementById('bgVideo');
+    function slowDown() { vid.playbackRate = 0.6; }
+    slowDown();
+    vid.addEventListener('loadedmetadata', slowDown);
+    vid.addEventListener('play', slowDown);
+  })();
+
+  // ── יצירת שדה נקודות אדומות קטנות במיקומים אקראיים ──
+  var DOT_COUNT = 40;                 // כמות הנקודות - אפשר לשנות
+  var MIN_DUR = 2.5, MAX_DUR = 5.5;   // טווח משך האנימציה (שניות)
+  var MAX_DELAY = 5;                  // עיכוב מקסימלי לפני שכל נקודה מתחילה (שניות)
+
+  var layer = document.getElementById('dotsLayer');
+  var frag = document.createDocumentFragment();
+  for (var i = 0; i < DOT_COUNT; i++) {
+    var dot = document.createElement('span');
+    dot.className = 'dot';
+    var x = (Math.random() * 100).toFixed(2) + '%';
+    var y = (Math.random() * 100).toFixed(2) + '%';
+    var delay = (Math.random() * MAX_DELAY).toFixed(2) + 's';
+    var dur = (MIN_DUR + Math.random() * (MAX_DUR - MIN_DUR)).toFixed(2) + 's';
+    dot.style.setProperty('--x', x);
+    dot.style.setProperty('--y', y);
+    dot.style.setProperty('--delay', delay);
+    dot.style.setProperty('--dur', dur);
+    frag.appendChild(dot);
+  }
+  layer.appendChild(frag);
+</script>
+
+</body>
+</html>
