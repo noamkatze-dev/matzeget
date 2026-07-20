@@ -64,48 +64,18 @@
 <body>
 
 <div id="stage">
-  <video id="bgVideo" autoplay muted playsinline>
+  <video id="bgVideo" autoplay muted loop playsinline>
     <source src="sky.mp4" type="video/mp4">
   </video>
 
   <script>
-    // ── ניגון הלוך-חזור (ping-pong): במקום לוואידאו לקפוץ להתחלה
-    // כשהוא מגיע לסוף, הוא מתהפך ומתחיל לנגן אחורה עד שהוא מגיע
-    // לתחילת הקובץ, ואז שוב קדימה - ולחוזר חלילה.
-    // דפדפנים לא תומכים בניגון אחורה אמיתי (playbackRate שלילי),
-    // אז זה מבוצע ידנית על ידי עדכון currentTime בכל פריים.
+    // האטת הווידאו ב-40% (מהירות 60% מהמקור)
     (function () {
       var vid = document.getElementById('bgVideo');
-      var SPEED = 0.6;              // מהירות יחסית למקור (0.6 = 60%)
-      var direction = 1;            // 1 = קדימה, -1 = אחורה
-      var lastTs = null;
-      var ready = false;
-
-      vid.addEventListener('loadedmetadata', function () {
-        ready = true;
-        vid.pause(); // הניגון מבוצע כולו ידנית דרך currentTime
-        requestAnimationFrame(step);
-      });
-
-      function step(ts) {
-        if (!ready) { requestAnimationFrame(step); return; }
-        if (lastTs === null) lastTs = ts;
-        var deltaSec = (ts - lastTs) / 1000;
-        lastTs = ts;
-
-        var newTime = vid.currentTime + direction * SPEED * deltaSec;
-
-        if (newTime >= vid.duration) {
-          newTime = vid.duration;
-          direction = -1;
-        } else if (newTime <= 0) {
-          newTime = 0;
-          direction = 1;
-        }
-
-        vid.currentTime = newTime;
-        requestAnimationFrame(step);
-      }
+      function slowDown() { vid.playbackRate = 0.6; }
+      slowDown();
+      vid.addEventListener('loadedmetadata', slowDown);
+      vid.addEventListener('play', slowDown);
     })();
   </script>
 
