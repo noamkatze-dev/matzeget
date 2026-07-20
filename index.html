@@ -77,6 +77,56 @@
   #sceneB canvas {
     display: block;
   }
+
+  /* ── SCENE C: sobel analysis + auto-simulated gaze reveal ── */
+  #sceneC {
+    background: #000;
+    cursor: none;
+  }
+  #sceneC canvas.p5-video-canvas {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+  #sceneC-dotCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+  }
+  #sceneC-annLayer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 6;
+  }
+  #sceneC-annLayer .ann {
+    position: absolute;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: #ff1500;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    text-shadow: none;
+    pointer-events: none;
+    opacity: 0;
+  }
+  #sceneC-gazeDot {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 3px solid rgba(255,21,0,0.85);
+    box-shadow: none;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 50;
+    display: none;
+  }
 </style>
 </head>
 <body>
@@ -93,6 +143,13 @@
 
 <!-- SCENE B -->
 <div id="sceneB" class="scene"></div>
+
+<!-- SCENE C -->
+<div id="sceneC" class="scene" style="position:fixed;">
+  <canvas id="sceneC-dotCanvas"></canvas>
+  <div id="sceneC-annLayer"></div>
+  <div id="sceneC-gazeDot"></div>
+</div>
 
 <script>
   // ═══════════════════════════════════════════════════════════════
@@ -431,10 +488,381 @@
   });
 
   // ═══════════════════════════════════════════════════════════════
+  // SCENE C — Sobel edge analysis + AUTOMATED (simulated) gaze reveal
+  // אין גישה לעכבר, אז במקום מעקב עכבר אמיתי יש כאן "מבט מדומה"
+  // שנודד לבד בין נקודות אקראיות על המסך ומגלה תוויות בדרכו.
+  // ═══════════════════════════════════════════════════════════════
+  (function () {
+    'use strict';
+
+    /* ── CONSTANTS — זהה למקור ── */
+    const W_ANA       = 160;
+    const H_ANA       = 90;
+    const N_ANN       = 250;
+    const DOT_STEP    = 2;
+    const DOT_THRESH  = 10;
+    const ANA_INTERVAL   = 600;
+    const REVEAL_FRAC    = 0.030;
+    const MAX_BLUR       = 7;
+    const GAZE_LERP      = 0.10;
+    const BLUR_GROW_RATE  = 2.8;
+    const BLUR_CLEAR_RATE = 20.0;
+
+    /* ── פרמטרים של המבט המדומה ── */
+    const SIM_MIN_DWELL = 1200;   // כמה זמן מינימלי "המבט" נשאר סביב יעד (ms)
+    const SIM_MAX_DWELL = 2600;   // כמה זמן מקסימלי
+    const SIM_DRIFT_LERP = 0.02;  // קצב הנדידה האיטית לעבר היעד
+
+    const sceneEl   = document.getElementById('sceneC');
+    const dotCanvas = document.getElementById('sceneC-dotCanvas');
+    const dotCtx    = dotCanvas.getContext('2d');
+    const annLayer  = document.getElementById('sceneC-annLayer');
+    const gazeDot   = document.getElementById('sceneC-gazeDot');
+
+    const anaC   = document.createElement('canvas');
+    anaC.width   = W_ANA; anaC.height = H_ANA;
+    const anaCtx = anaC.getContext('2d', { willReadFrequently: true });
+
+    const preC   = document.createElement('canvas');
+    preC.width   = W_ANA; preC.height = H_ANA;
+    const preCtx = preC.getContext('2d', { willReadFrequently: true });
+
+    let pool      = [];
+    let prevPx    = null;
+    let rawGX = 0.5, rawGY = 0.5;
+    let sGX   = 0.5, sGY   = 0.5;
+    let lastAnaTs  = -9999;
+    let lastGazeTs = 0;
+
+    let videoEl = null;
+    let videoW  = 1, videoH = 1;
+    let renderOffX = 0, renderOffY = 0, renderW = 0, renderH = 0;
+
+    function buildPool() {
+      annLayer.innerHTML = '';
+      pool = [];
+      for (let i = 0; i < N_ANN; i++) {
+        const el = document.createElement('span');
+        el.className = 'ann';
+        annLayer.appendChild(el);
+        pool.push({ el, x: 0.5, y: 0.5, revealed: false, blurLevel: 0, active: false });
+      }
+    }
+
+    function sizeOverlays() {
+      dotCanvas.width  = window.innerWidth;
+      dotCanvas.height = window.innerHeight;
+    }
+
+    function sobel(px, w, h) {
+      const g  = new Float32Array(w * h);
+      const gx = new Float32Array(w * h);
+      const gy = new Float32Array(w * h);
+      const mg = new Float32Array(w * h);
+      for (let i = 0; i < w * h; i++) {
+        const o = i * 4;
+        g[i] = 0.299 * px[o] + 0.587 * px[o+1] + 0.114 * px[o+2];
+      }
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const i  = y * w + x;
+          const tl = g[i-w-1], tc = g[i-w], tr = g[i-w+1];
+          const ml = g[i-1],               mr = g[i+1];
+          const bl = g[i+w-1], bc = g[i+w], br = g[i+w+1];
+          gx[i] = (tr + 2*mr + br) - (tl + 2*ml + bl);
+          gy[i] = (bl + 2*bc + br) - (tl + 2*tc + tr);
+          mg[i] = Math.hypot(gx[i], gy[i]);
+        }
+      }
+      return { gx, gy, mg };
+    }
+
+    function drawDots(pts) {
+      const W = dotCanvas.width, H = dotCanvas.height;
+      dotCtx.clearRect(0, 0, W, H);
+      dotCtx.fillStyle = 'rgba(255,21,0,0.82)';
+      dotCtx.beginPath();
+      for (const p of pts) {
+        const sx = renderOffX + p.nx * renderW;
+        const sy = renderOffY + p.ny * renderH;
+        dotCtx.rect(sx - 1, sy - 1, 2, 2);
+      }
+      dotCtx.fill();
+    }
+
+    function rStats(px, w, h, nx0, ny0, nx1, ny1) {
+      const x0 = Math.max(0, Math.floor(nx0 * w));
+      const y0 = Math.max(0, Math.floor(ny0 * h));
+      const x1 = Math.min(w - 1, Math.floor(nx1 * w));
+      const y1 = Math.min(h - 1, Math.floor(ny1 * h));
+      let sL = 0, sL2 = 0, sS = 0, n = 0;
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const o  = (y * w + x) * 4;
+          const r  = px[o]   / 255;
+          const gr = px[o+1] / 255;
+          const b  = px[o+2] / 255;
+          const mx = Math.max(r, gr, b), mn = Math.min(r, gr, b);
+          const l  = (mx + mn) * 0.5;
+          const s  = (mx === mn) ? 0 : (mx - mn) / (1 - Math.abs(2 * l - 1));
+          sL += l; sL2 += l * l; sS += s; n++;
+        }
+      }
+      if (!n) return { bright: 128, contrast: 0, sat: 0 };
+      const al = sL / n;
+      return {
+        bright:   Math.round(al * 255),
+        contrast: Math.round(Math.sqrt(Math.max(0, sL2/n - al*al)) * 255),
+        sat:      Math.round(sS / n * 100)
+      };
+    }
+
+    function rMotion(px, prev, w, h, nx0, ny0, nx1, ny1) {
+      if (!prev) return 0;
+      const x0 = Math.max(0, Math.floor(nx0 * w));
+      const y0 = Math.max(0, Math.floor(ny0 * h));
+      const x1 = Math.min(w - 1, Math.floor(nx1 * w));
+      const y1 = Math.min(h - 1, Math.floor(ny1 * h));
+      let d = 0, n = 0;
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const o = (y * w + x) * 4;
+          d += Math.abs(px[o]   - prev[o])
+             + Math.abs(px[o+1] - prev[o+1])
+             + Math.abs(px[o+2] - prev[o+2]);
+          n += 3;
+        }
+      }
+      return n ? d / n : 0;
+    }
+
+    function makeLabel(dir, mag, st, mv) {
+      if (mv > 38)           return `CRITICAL / MOTION_FAST`;
+      if (mv > 16) {
+        const s = Math.min(99, Math.max(10, Math.round(99 - mv * 2.4)));
+        return `${dir} / STAB_${s}%`;
+      }
+      if (st.contrast > 52)  return `${dir} / CONTRAST_HIGH`;
+      if (st.bright   > 178) return `DETAIL / BRIGHT_${st.bright}`;
+      if (st.bright   < 42)  return `DETAIL / DARK_${st.bright}`;
+      if (mag         > 210) return `${dir} / SHARP_${Math.round(mag / 3)}`;
+      if (st.sat      > 42)  return `${dir} / SAT_${st.sat}%`;
+      if (st.contrast > 22)  return `${dir} / CONTRAST_${st.contrast}`;
+      return `STABLE / EDGE_${Math.round(mag)}`;
+    }
+
+    function analyze() {
+      if (!videoEl || videoEl.readyState < 2) return;
+
+      try {
+        anaCtx.drawImage(videoEl, 0, 0, W_ANA, H_ANA);
+      } catch(e) { return; }
+
+      const id = anaCtx.getImageData(0, 0, W_ANA, H_ANA);
+      const px = id.data;
+      const { gx, gy, mg } = sobel(px, W_ANA, H_ANA);
+
+      const all = [];
+      for (let y = 1; y < H_ANA - 1; y += DOT_STEP) {
+        for (let x = 1; x < W_ANA - 1; x += DOT_STEP) {
+          const i = y * W_ANA + x;
+          if (mg[i] >= DOT_THRESH) all.push({ i, mag: mg[i] });
+        }
+      }
+      all.sort((a, b) => b.mag - a.mag);
+      if (all.length > N_ANN) all.length = N_ANN;
+
+      const pts = [];
+      const m = 0.06;
+
+      for (const { i, mag } of all) {
+        const bx = i % W_ANA, by = Math.floor(i / W_ANA);
+        const nx = bx / W_ANA, ny = by / H_ANA;
+
+        const st = rStats(px, W_ANA, H_ANA, nx-m, ny-m, nx+m, ny+m);
+        const mv = rMotion(px, prevPx, W_ANA, H_ANA, nx-m, ny-m, nx+m, ny+m);
+
+        const agx = Math.abs(gx[i]), agy = Math.abs(gy[i]);
+        const a   = ((Math.atan2(gy[i], gx[i]) * 180 / Math.PI) % 180 + 180) % 180;
+
+        let dir;
+        if      (agx > 90 && agy > 90)  dir = 'CORNER';
+        else if (a < 25 || a >= 155)     dir = 'HORIZONTAL';
+        else if (a >= 65 && a < 115)     dir = 'VERTICAL';
+        else                             dir = 'DIAGONAL';
+
+        pts.push({
+          nx:    Math.max(0.01, Math.min(0.99, nx)),
+          ny:    Math.max(0.01, Math.min(0.99, ny)),
+          label: makeLabel(dir, mag, st, mv)
+        });
+      }
+
+      drawDots(pts);
+
+      const n = Math.min(pts.length, N_ANN);
+      for (let i = 0; i < N_ANN; i++) {
+        const a = pool[i];
+        if (i < n) {
+          const p = pts[i];
+          a.active = true;
+          if (!a.revealed) {
+            a.x = p.nx;
+            a.y = p.ny;
+            a.blurLevel = 0;
+            a.el.style.opacity = '0';
+            a.el.style.filter  = 'none';
+            const sx = renderOffX + p.nx * renderW;
+            const sy = renderOffY + p.ny * renderH;
+            a.el.style.left = sx + 'px';
+            a.el.style.top  = sy + 'px';
+            a.el.style.transform = (sx / window.innerWidth) > 0.62
+              ? 'translate(calc(-100% - 12px), -50%)'
+              : 'translate(12px, -50%)';
+          }
+          a.el.textContent = p.label;
+        } else {
+          a.active = false; a.revealed = false; a.blurLevel = 0;
+          a.el.textContent = '';
+          a.el.style.opacity = '0';
+          a.el.style.filter  = 'none';
+        }
+      }
+
+      preCtx.drawImage(videoEl, 0, 0, W_ANA, H_ANA);
+      prevPx = preCtx.getImageData(0, 0, W_ANA, H_ANA).data.slice();
+    }
+
+    function applyGaze(ts) {
+      const dt = lastGazeTs ? Math.min((ts - lastGazeTs) / 1000, 0.05) : 0;
+      lastGazeTs = ts;
+
+      // נדידה איטית לעבר יעד המבט המדומה הנוכחי (simGX/simGY),
+      // ואז אותו lerp שהיה קיים במקור מיישר את "העין" (sGX/sGY) אחריה
+      rawGX += (simGX - rawGX) * SIM_DRIFT_LERP;
+      rawGY += (simGY - rawGY) * SIM_DRIFT_LERP;
+
+      sGX += (rawGX - sGX) * GAZE_LERP;
+      sGY += (rawGY - sGY) * GAZE_LERP;
+
+      const W = window.innerWidth, H = window.innerHeight;
+      const gpx = sGX * W, gpy = sGY * H;
+
+      gazeDot.style.left = gpx + 'px';
+      gazeDot.style.top  = gpy + 'px';
+
+      const revR = Math.min(W, H) * REVEAL_FRAC;
+
+      for (const a of pool) {
+        if (!a.active || !a.el.textContent) continue;
+
+        const dsx = renderOffX + a.x * renderW;
+        const dsy = renderOffY + a.y * renderH;
+        const d   = Math.hypot(dsx - gpx, dsy - gpy);
+        const near = d < revR;
+
+        if (near) {
+          if (!a.revealed) { a.revealed = true; a.blurLevel = 0; }
+          a.blurLevel = Math.max(0, a.blurLevel - BLUR_CLEAR_RATE * dt);
+          a.el.style.opacity = '1';
+          a.el.style.filter  = 'none';
+        } else if (a.revealed) {
+          a.blurLevel = Math.min(MAX_BLUR, a.blurLevel + BLUR_GROW_RATE * dt);
+          a.el.style.filter = `blur(${a.blurLevel.toFixed(2)}px)`;
+          if (a.blurLevel >= MAX_BLUR * 0.98) {
+            a.revealed = false; a.blurLevel = 0;
+            a.el.style.opacity = '0'; a.el.style.filter = 'none';
+          }
+        } else {
+          a.el.style.opacity = '0';
+          a.el.style.filter  = 'none';
+        }
+      }
+    }
+
+    function mainLoop(ts) {
+      applyGaze(ts);
+      if (ts - lastAnaTs > ANA_INTERVAL) { analyze(); lastAnaTs = ts; }
+      requestAnimationFrame(mainLoop);
+    }
+
+    /* ── מבט מדומה: בוחר יעד אקראי חדש כל כמה שניות ונודד אליו לאט ── */
+    let simGX = 0.5, simGY = 0.5;
+    function pickNewSimTarget() {
+      simGX = 0.12 + Math.random() * 0.76;
+      simGY = 0.12 + Math.random() * 0.76;
+      const dwell = SIM_MIN_DWELL + Math.random() * (SIM_MAX_DWELL - SIM_MIN_DWELL);
+      setTimeout(pickNewSimTarget, dwell);
+    }
+    pickNewSimTarget();
+    gazeDot.style.display = 'block'; // תמיד גלוי - אין "עכבר שיצא מהמסך"
+
+    new p5(function(p) {
+      let vid;
+
+      p.preload = function() {
+        vid = p.createVideo('statue.mp4');
+      };
+
+      p.setup = function() {
+        const cnv = p.createCanvas(window.innerWidth, window.innerHeight);
+        cnv.class('p5-video-canvas');
+        cnv.parent('sceneC');
+
+        vid.hide();
+        vid.volume(0);
+        vid.loop();
+
+        vid.elt.onloadeddata = () => {
+          videoEl = vid.elt;
+          videoW  = vid.width;
+          videoH  = vid.height;
+        };
+
+        buildPool();
+        sizeOverlays();
+        window.addEventListener('resize', () => {
+          p.resizeCanvas(window.innerWidth, window.innerHeight);
+          sizeOverlays();
+        });
+
+        requestAnimationFrame(mainLoop);
+      };
+
+      p.draw = function() {
+        p.background(0);
+
+        if (!videoEl || videoW === 0) return;
+
+        const cR = p.width / p.height;
+        const vR = videoW  / videoH;
+        let dW, dH, oX, oY;
+
+        if (vR > cR) {
+          dH = p.height; dW = vR * dH;
+          oX = (p.width - dW) / 2; oY = 0;
+        } else {
+          dW = p.width; dH = dW / vR;
+          oX = 0; oY = (p.height - dH) / 2;
+        }
+
+        p.image(vid, oX, oY, dW, dH);
+
+        renderOffX = oX; renderOffY = oY;
+        renderW    = dW; renderH    = dH;
+      };
+    });
+  })();
+
+  // ═══════════════════════════════════════════════════════════════
   // SCENE SWITCHING — לחיצה על רווח עוברת לאנימציה הבאה
   // ═══════════════════════════════════════════════════════════════
   (function () {
-    var scenes = [document.getElementById('sceneA'), document.getElementById('sceneB')];
+    var scenes = [
+      document.getElementById('sceneA'),
+      document.getElementById('sceneB'),
+      document.getElementById('sceneC')
+    ];
     var current = 0;
 
     document.addEventListener('keydown', function (e) {
