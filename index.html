@@ -80,7 +80,7 @@
 
   /* ── SCENE C: sobel analysis + auto-simulated gaze reveal ── */
   #sceneC {
-    background: #000;
+    background: #ffffff;
     cursor: none;
   }
   #sceneC canvas.p5-video-canvas {
@@ -830,20 +830,21 @@
       };
 
       p.draw = function() {
-        p.background(0);
+        p.background(255);
 
         if (!videoEl || videoW === 0) return;
 
+        // CONTAIN scale — הווידאו מוצג בשלמותו, ממורכז, על רקע לבן
         const cR = p.width / p.height;
         const vR = videoW  / videoH;
         let dW, dH, oX, oY;
 
         if (vR > cR) {
-          dH = p.height; dW = vR * dH;
-          oX = (p.width - dW) / 2; oY = 0;
-        } else {
           dW = p.width; dH = dW / vR;
           oX = 0; oY = (p.height - dH) / 2;
+        } else {
+          dH = p.height; dW = vR * dH;
+          oX = (p.width - dW) / 2; oY = 0;
         }
 
         p.image(vid, oX, oY, dW, dH);
