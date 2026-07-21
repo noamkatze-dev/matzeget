@@ -925,8 +925,8 @@
     const FIX_DISPERSION=0.04, FIX_MIN_DURATION=150;
     const SAC_VELOCITY=0.8, SAC_MIN_AMP=0.03;
     const W_HEAT=200, H_HEAT=112, HEAT_SIGMA=0.07, HEAT_WEIGHT=0.18, HEAT_DECAY=0.9975;
-    const GAZE_LERP=0.08;
-    const SIM_MIN_DWELL=700, SIM_MAX_DWELL=1600, SIM_DRIFT_LERP=0.02;
+    const GAZE_LERP=0.18;
+    const SIM_MIN_DWELL=900, SIM_MAX_DWELL=1600, SIM_DRIFT_LERP=0.02;
 
     const srcVideo = document.getElementById('sceneD-srcVideo');
     const anaCtx = document.getElementById('sceneD-anaC').getContext('2d',{willReadFrequently:true});
@@ -1094,7 +1094,7 @@
 
     let fastPhaseUntil = 0;
     const FAST_LERP = 0.35;
-    const FAST_PHASE_MS = 220;
+    const FAST_PHASE_MS = 180;
 
     function triggerFreshJump(){
       simGX=0.12+Math.random()*0.76; simGY=0.12+Math.random()*0.76;
