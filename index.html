@@ -926,7 +926,7 @@
     const SAC_VELOCITY=0.8, SAC_MIN_AMP=0.03;
     const W_HEAT=200, H_HEAT=112, HEAT_SIGMA=0.07, HEAT_WEIGHT=0.18, HEAT_DECAY=0.9975;
     const GAZE_LERP=0.08;
-    const SIM_MIN_DWELL=1400, SIM_MAX_DWELL=3200, SIM_DRIFT_LERP=0.02;
+    const SIM_MIN_DWELL=700, SIM_MAX_DWELL=1600, SIM_DRIFT_LERP=0.02;
 
     const srcVideo = document.getElementById('sceneD-srcVideo');
     const anaCtx = document.getElementById('sceneD-anaC').getContext('2d',{willReadFrequently:true});
@@ -1123,7 +1123,7 @@
     function drawVideoFrame(ctx, cw, ch){
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0,0,cw,ch);
-      if (videoW<=1) return {dW:0,dH:0,oX:0,oY:0};
+      if (videoW<=1) return {dW:cw,dH:ch,oX:0,oY:0}; // הווידאו עוד לא נטען - השכבה עדיין תצויר בגודל מלא
       const fit = getVideoFit(cw,ch);
       ctx.drawImage(srcVideo, fit.oX, fit.oY, fit.dW, fit.dH);
       return fit;
