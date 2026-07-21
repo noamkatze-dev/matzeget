@@ -1283,6 +1283,22 @@
       running = val;
       if (running) requestAnimationFrame(mainLoop);
     };
+
+    // חשיפה זמנית לצורך דיבאג מהקונסולה - אפשר להריץ:
+    // __sceneD_debug.saccadeHistory.length
+    // __sceneD_debug.fixationHistory.length
+    // __sceneD_debug.videoW  (אם 1 - הווידאו עדיין לא נטען בכלל)
+    window.__sceneD_debug = {
+      get saccadeHistory() { return saccadeHistory; },
+      get fixationHistory() { return fixationHistory; },
+      get gazeHistory() { return gazeHistory; },
+      get videoW() { return videoW; },
+      get videoH() { return videoH; },
+      get simGX() { return simGX; },
+      get simGY() { return simGY; },
+      get rawGX() { return rawGX; },
+      get sGX() { return sGX; },
+    };
   })();
 
   // ═══════════════════════════════════════════════════════════════
