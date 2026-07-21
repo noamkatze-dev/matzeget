@@ -143,10 +143,12 @@
   #sceneD-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    /* המרווח האנכי בין השורה העליונה לתחתונה זהה למרווח האופקי בין הסרטונים */
-    row-gap: var(--sceneD-gap);
-    column-gap: var(--sceneD-gap);
-    --sceneD-gap: 18px;
+    /* המרווח בין השורות (row-gap) והמרווח בין העמודות (column-gap)
+       מחושבים דינמית ב-JS כך שהמרווח הנראה-לעין בין תוכן הסרטונים
+       בפועל (לא רק בין קופסאות ה-4:3) יהיה שווה בשני הכיוונים -
+       ראו updateGapsForLetterbox() בקוד. */
+    row-gap: var(--sceneD-gap-row, 18px);
+    column-gap: var(--sceneD-gap-col, 18px);
     align-items: start;
     direction: ltr;
   }
@@ -159,11 +161,7 @@
   #sceneD .sceneD-panel-canvas-wrap {
     position: relative;
     width: 100%;
-    /* יחס-הגובה-רוחב מתעדכן דינמית ל-יחס האמיתי של הסרטון (ב-JS),
-       כך שהתיבה מתאימה בדיוק לסרטון - בלי שוליים לבנים פנימיים
-       ובלי לשנות את גודל/יחס הסרטון עצמו. עד שהוא נטען, נופלים
-       חזרה ל-4:3 כברירת מחדל. */
-    aspect-ratio: var(--videoAR, 4 / 3);
+    aspect-ratio: 4 / 3;
     background: #ffffff;
     overflow: hidden;
   }
@@ -1300,19 +1298,51 @@
       heatCanvas.width=W_HEAT; heatCanvas.height=H_HEAT;
       heatCtx=heatCanvas.getContext('2d');
 
-      function applyRealAspectRatio() {
+      /* ── איזון המרווח הנראה-לעין ──────────────────────────────────
+         התיבה של כל פאנל נשארת קבועה ביחס 4:3 (הגודל המקורי), והסרטון
+         מוצג בתוכה ב-"contain" בדיוק כמו קודם - בלי לשנות את גודלו
+         או את היחס שלו. הבעיה היא שכשהיחס של הסרטון שונה מ-4:3,
+         נוצרים שוליים לבנים (letterbox/pillarbox) בתוך התיבה עצמה,
+         בנוסף ל-grid-gap שבין התיבות. הפונקציה הזו מחשבת כמה שוליים
+         כאלה נוצרים בכל כיוון, ומקטינה את ה-grid-gap המתאים כך שסך
+         הרווח הנראה-לעין (שוליים + gap) יהיה זהה אופקית ואנכית.
+      */
+      const BASE_GAP = 18; // המרווח הכולל הרצוי (בפיקסלים) בין הסרטונים בפועל
+
+      function updateGapsForLetterbox() {
+        if (videoW <= 1 || !panels[0] || !panels[0].canvas) return;
+        const wrap = panels[0].canvas.parentElement;
+        const cw = wrap.offsetWidth, ch = wrap.offsetHeight;
+        if (!cw || !ch) return;
+
+        const cR = cw / ch, vR = videoW / videoH;
+        let dW, dH;
+        if (vR > cR) { dW = cw; dH = dW / vR; }
+        else         { dH = ch; dW = vR * dH; }
+
+        const pillarbox = Math.max(0, cw - dW); // שוליים לבנים משמאל+מימין בתוך כל תיבה
+        const letterbox = Math.max(0, ch - dH); // שוליים לבנים מלמעלה+מלמטה בתוך כל תיבה
+
+        const colGap = Math.max(0, BASE_GAP - pillarbox);
+        const rowGap = Math.max(0, BASE_GAP - letterbox);
+
+        grid.style.setProperty('--sceneD-gap-col', colGap + 'px');
+        grid.style.setProperty('--sceneD-gap-row', rowGap + 'px');
+      }
+
+      function applyRealVideoSize() {
         videoW = srcVideo.videoWidth;
         videoH = srcVideo.videoHeight;
         if (videoW > 0 && videoH > 0) {
-          // התיבה של כל פאנל מקבלת עכשיו את יחס-הגובה-רוחב האמיתי
-          // של הסרטון, כדי שהוא ימלא אותה בשלמותו בלי שוליים פנימיים.
-          grid.style.setProperty('--videoAR', videoW + ' / ' + videoH);
           sizePanels();
+          updateGapsForLetterbox();
         }
       }
-      srcVideo.addEventListener('loadedmetadata', applyRealAspectRatio);
+      srcVideo.addEventListener('loadedmetadata', applyRealVideoSize);
       srcVideo.play().catch(() => {});
-      if (srcVideo.videoWidth) applyRealAspectRatio();
+      if (srcVideo.videoWidth) applyRealVideoSize();
+
+      window.addEventListener('resize', updateGapsForLetterbox);
 
       pickNewSimTarget();
       running = true;
