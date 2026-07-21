@@ -1774,6 +1774,7 @@
     }
 
     window.addEventListener('resize', resizeDots);
+    window.__sceneSession_resize = resizeDots;
 
     function preloadImages(items) {
       return Promise.all(items.map(item => new Promise(r => {
@@ -1894,6 +1895,7 @@
       scenes[current].classList.add('active');
       if (scenes[current].id === 'sceneD' && window.__sceneD_setRunning) window.__sceneD_setRunning(true);
       if (scenes[current].id === 'sceneD' && window.__sceneD_updateGaps) window.__sceneD_updateGaps();
+      if (scenes[current].id === 'sceneSession' && window.__sceneSession_resize) window.__sceneSession_resize();
     });
   })();
 </script>
