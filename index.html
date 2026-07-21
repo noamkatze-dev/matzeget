@@ -53,21 +53,6 @@
     pointer-events: none;
   }
 
-  /* ── גריד רקע דק, תאים בגודל viewport-height/6 ── */
-  #splashGridOverlay {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-    background-image:
-      linear-gradient(to right, rgba(255,0,0,0.10) 0.5px, transparent 0.5px),
-      linear-gradient(to bottom, rgba(255,0,0,0.10) 0.5px, transparent 0.5px);
-    background-size: calc(100vh / 6) calc(100vh / 6);
-    background-position: 50vw 50vh;
-    background-repeat: repeat;
-    background-color: rgba(0,0,0,0.05);
-  }
-
   /* ── שכבת נתוני הספלאש (פינות, מיני-לוגו, שורות סטטיסטיקה) ── */
   #splashDataOverlay {
     position: absolute;
@@ -380,20 +365,6 @@
     pointer-events: none;
   }
 
-  #spectrumGridOverlay {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-    background-image:
-      linear-gradient(to right, rgba(255,0,0,0.10) 0.5px, transparent 0.5px),
-      linear-gradient(to bottom, rgba(255,0,0,0.10) 0.5px, transparent 0.5px);
-    background-size: calc(100vh / 6) calc(100vh / 6);
-    background-position: 50vw 50vh;
-    background-repeat: repeat;
-    background-color: rgba(0,0,0,0.05);
-  }
-
   #spectrumInner {
     position: relative;
     z-index: 2;
@@ -519,8 +490,8 @@
     font-weight: 700;
     color: #FF0000;
   }
-  /* ── SCENE DATA WHITE / DATA VIDEO: כל הנתונים הויזואליים מפוזרים ── */
-  #sceneDataWhite, #sceneDataVideo {
+  /* ── SCENE DATA WHITE: כל הנתונים הויזואליים מפוזרים על רקע לבן ── */
+  #sceneDataWhite {
     background: #ffffff;
     overflow: hidden;
   }
@@ -530,16 +501,6 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
-  }
-
-  #dataVideoBg {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    z-index: 0;
-    pointer-events: none;
   }
 
   .dataposter-layer {
@@ -554,25 +515,12 @@
     0%, 100% { opacity: 0.15; }
     50% { opacity: 1; }
   }
-  @keyframes dpDraw {
-    0%   { stroke-dashoffset: 1; opacity: 1; }
-    40%  { stroke-dashoffset: 0; opacity: 1; }
-    75%  { stroke-dashoffset: 0; opacity: 1; }
-    100% { stroke-dashoffset: -1; opacity: 0; }
+  @keyframes dpDash {
+    to { stroke-dashoffset: -60; }
   }
   @keyframes dpCrossPulse {
     0%, 100% { transform: scale(1); opacity: 0.55; }
     50% { transform: scale(1.3); opacity: 1; }
-  }
-  @keyframes dpFixGrow {
-    0%   { transform: scale(0.2); opacity: 0; }
-    30%  { transform: scale(1); opacity: 0.9; }
-    70%  { transform: scale(1); opacity: 0.9; }
-    100% { transform: scale(0.2); opacity: 0; }
-  }
-  @keyframes dpHeatPulse {
-    0%, 100% { opacity: 0.25; transform: scale(0.9); }
-    50% { opacity: 0.7; transform: scale(1.08); }
   }
 
   /* טבעת פועמת (כמו נקודת מבט) */
@@ -617,38 +565,9 @@
   .dataposter-cross::before { left: 50%; top: 0; width: 1px; height: 100%; margin-left: -0.5px; }
   .dataposter-cross::after  { top: 50%; left: 0; height: 1px; width: 100%; margin-top: -0.5px; }
 
-  /* עיגול קיבוע - גדל ודועך */
-  .dataposter-fixation {
-    position: absolute;
-    border-radius: 50%;
-    background: rgba(255,0,0,0.18);
-    border: 2px solid rgba(255,0,0,0.85);
-    transform-origin: center;
-    animation: dpFixGrow ease-in-out infinite;
-  }
-
-  /* כתם מפת-חום - פועם ומטושטש */
-  .dataposter-heat {
-    position: absolute;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(255,0,0,0.55) 0%, rgba(255,0,0,0.25) 45%, rgba(255,0,0,0) 72%);
-    filter: blur(2px);
-    transform-origin: center;
-    animation: dpHeatPulse ease-in-out infinite;
-  }
-
-  /* קו/מסלול מקווקו שנמתח ונמוג (משתמש בטריק pathLength=1) */
+  /* קו מקווקו מונפש (marching ants) */
   .dataposter-line {
-    fill: none;
-    stroke-dasharray: 1;
-    stroke-dashoffset: 1;
-    animation: dpDraw linear infinite;
-  }
-
-  /* נקודה על ה-SVG (למסלול הסריקה) - קנה-מידה סביב המרכז שלה */
-  .dataposter-svgdot {
-    transform-box: fill-box;
-    transform-origin: center;
+    animation: dpDash 1.1s linear infinite;
   }
 
   .dataposter-svg {
@@ -679,8 +598,6 @@
         vid.addEventListener('play', slowDown);
       })();
     </script>
-
-    <div id="splashGridOverlay"></div>
 
     <div id="splashDataOverlay">
       <span class="splash-corner tl"></span>
@@ -736,7 +653,6 @@
 <div id="sceneSpectrum" class="scene">
   <div id="spectrumScreen">
     <img id="spectrumBg" src="https://static.wixstatic.com/media/cd7757_819bc078308140e390113f9ad1230fb9~mv2.png" alt="background">
-    <div id="spectrumGridOverlay"></div>
 
     <div id="spectrumInner">
       <div id="spectrumLabel">פרשנות ויזואלית</div>
@@ -770,16 +686,6 @@
 <div id="sceneDataWhite" class="scene">
   <div class="dataposter-stage">
     <div id="dataWhiteLayer" class="dataposter-layer"></div>
-  </div>
-</div>
-
-<!-- SCENE DATA VIDEO -->
-<div id="sceneDataVideo" class="scene">
-  <div class="dataposter-stage">
-    <video id="dataVideoBg" autoplay muted loop playsinline>
-      <source src="sky.mp4" type="video/mp4">
-    </video>
-    <div id="dataVideoLayer" class="dataposter-layer"></div>
   </div>
 </div>
 
@@ -2779,131 +2685,60 @@
       }
     }
 
-    function makeSvgLayer(container) {
+    function makeConnectors(container, count) {
       const svgNS = 'http://www.w3.org/2000/svg';
       const svg = document.createElementNS(svgNS, 'svg');
       svg.setAttribute('class', 'dataposter-svg');
       const W = container.clientWidth || 1000, H = container.clientHeight || 600;
       svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
       svg.setAttribute('preserveAspectRatio', 'none');
-      container.appendChild(svg);
-      return { svg, svgNS, W, H };
-    }
 
-    // קווי חיבור מקווקווים שנמתחים (מצטיירים) ואז דועכים - "סקאדות" בודדות
-    function makeConnectors(svgLayer, count) {
-      const { svg, svgNS, W, H } = svgLayer;
+      const defs = document.createElementNS(svgNS, 'defs');
+      const marker = document.createElementNS(svgNS, 'marker');
+      marker.setAttribute('id', 'dpArrow');
+      marker.setAttribute('viewBox', '0 0 10 10');
+      marker.setAttribute('refX', '8'); marker.setAttribute('refY', '5');
+      marker.setAttribute('markerWidth', '6'); marker.setAttribute('markerHeight', '6');
+      marker.setAttribute('orient', 'auto-start-reverse');
+      const arrowPath = document.createElementNS(svgNS, 'path');
+      arrowPath.setAttribute('d', 'M0,0 L10,5 L0,10 z');
+      arrowPath.setAttribute('fill', 'rgba(255,0,0,0.75)');
+      marker.appendChild(arrowPath);
+      defs.appendChild(marker);
+      svg.appendChild(defs);
+
       for (let i = 0; i < count; i++) {
         const x1 = rnd(0.1, 0.9) * W, y1 = rnd(0.1, 0.9) * H;
         const x2 = rnd(0.1, 0.9) * W, y2 = rnd(0.1, 0.9) * H;
         const line = document.createElementNS(svgNS, 'line');
         line.setAttribute('x1', x1); line.setAttribute('y1', y1);
         line.setAttribute('x2', x2); line.setAttribute('y2', y2);
-        line.setAttribute('pathLength', '1');
-        line.setAttribute('stroke', 'rgba(255,0,0,0.75)');
-        line.setAttribute('stroke-width', '1.6');
+        line.setAttribute('stroke', 'rgba(255,0,0,0.7)');
+        line.setAttribute('stroke-width', '1.4');
+        line.setAttribute('stroke-dasharray', '4 6');
+        line.setAttribute('marker-end', 'url(#dpArrow)');
         line.setAttribute('class', 'dataposter-line');
-        line.style.animationDelay = rnd(0, 1.6).toFixed(2) + 's';
-        line.style.animationDuration = rnd(1.4, 2.4).toFixed(2) + 's';
+        line.style.animationDelay = rnd(0, 1.1).toFixed(2) + 's';
+        line.style.animationDuration = rnd(0.8, 1.6).toFixed(2) + 's';
         svg.appendChild(line);
       }
-    }
-
-    // מסלול סריקה - כמה נקודות מחוברות בקו שנמתח ברצף (בלי מספרים/טקסט)
-    function makeScanPath(svgLayer, count) {
-      const { svg, svgNS, W, H } = svgLayer;
-      const pts = [];
-      for (let i = 0; i < count; i++) pts.push([rnd(0.12, 0.88) * W, rnd(0.12, 0.88) * H]);
-
-      const path = document.createElementNS(svgNS, 'path');
-      const d = 'M ' + pts.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L ');
-      path.setAttribute('d', d);
-      path.setAttribute('pathLength', '1');
-      path.setAttribute('stroke', 'rgba(255,0,0,0.75)');
-      path.setAttribute('stroke-width', '1.6');
-      path.setAttribute('class', 'dataposter-line');
-      path.style.animationDelay = rnd(0, 1.2).toFixed(2) + 's';
-      path.style.animationDuration = rnd(2.4, 3.6).toFixed(2) + 's';
-      svg.appendChild(path);
-
-      pts.forEach(([px, py]) => {
-        const c = document.createElementNS(svgNS, 'circle');
-        c.setAttribute('cx', px); c.setAttribute('cy', py); c.setAttribute('r', 6);
-        c.setAttribute('fill', 'rgba(255,0,0,0.85)');
-        c.setAttribute('class', 'dataposter-svgdot');
-        c.style.animation = `dpFixGrow ${rnd(1.8,2.6).toFixed(2)}s ease-in-out infinite`;
-        c.style.animationDelay = rnd(0, 1.4).toFixed(2) + 's';
-        svg.appendChild(c);
-      });
-    }
-
-    // עיגולי קיבוע (fixation) שגדלים ודועכים
-    function makeFixations(container, count) {
-      for (let i = 0; i < count; i++) {
-        const el = document.createElement('span');
-        el.className = 'dataposter-fixation';
-        const d = rnd(28, 64);
-        el.style.width = d.toFixed(1) + 'px';
-        el.style.height = d.toFixed(1) + 'px';
-        el.style.left = rnd(4, 92).toFixed(2) + '%';
-        el.style.top = rnd(4, 92).toFixed(2) + '%';
-        el.style.marginLeft = (-d / 2).toFixed(1) + 'px';
-        el.style.marginTop = (-d / 2).toFixed(1) + 'px';
-        el.style.animationDelay = rnd(0, 2.6).toFixed(2) + 's';
-        el.style.animationDuration = rnd(2.2, 3.4).toFixed(2) + 's';
-        container.appendChild(el);
-      }
-    }
-
-    // כתמי מפת-חום מטושטשים שפועמים
-    function makeHeatBlobs(container, count) {
-      for (let i = 0; i < count; i++) {
-        const el = document.createElement('span');
-        el.className = 'dataposter-heat';
-        const d = rnd(120, 260);
-        el.style.width = d.toFixed(1) + 'px';
-        el.style.height = d.toFixed(1) + 'px';
-        el.style.left = rnd(0, 90).toFixed(2) + '%';
-        el.style.top = rnd(0, 90).toFixed(2) + '%';
-        el.style.marginLeft = (-d / 2).toFixed(1) + 'px';
-        el.style.marginTop = (-d / 2).toFixed(1) + 'px';
-        el.style.animationDelay = rnd(0, 3).toFixed(2) + 's';
-        el.style.animationDuration = rnd(3.5, 5.5).toFixed(2) + 's';
-        container.appendChild(el);
-      }
+      container.appendChild(svg);
     }
 
     function buildDataPoster(container) {
       container.innerHTML = '';
-      makeHeatBlobs(container, 3);
-      const svgLayer = makeSvgLayer(container);
-      makeConnectors(svgLayer, 4);
-      makeScanPath(svgLayer, 5);
+      makeConnectors(container, 5);
       makeAOIBoxes(container, 4);
-      makeFixations(container, 5);
       makeDots(container, 55);
       makeRings(container, 6);
       makeCrosses(container, 6);
     }
 
-    // ── וידאו הרקע (sky.mp4) — אותה התנהגות כמו בסצנה A ──
-    (function () {
-      const vid = document.getElementById('dataVideoBg');
-      if (!vid) return;
-      function slowDown() { vid.playbackRate = 0.6; }
-      slowDown();
-      vid.addEventListener('loadedmetadata', slowDown);
-      vid.addEventListener('play', slowDown);
-    })();
-
     // חושף החוצה כדי שמנגנון החלפת הסצנות יבנה פיזור חדש בכל פעם
-    // שנכנסים לאחת הסצנות האלה (מיקומים אקראיים טריים, ומידות SVG
-    // נכונות כי רק אז לקונטיינר יש גודל אמיתי על המסך).
+    // שנכנסים לסצנה הזו (מיקומים אקראיים טריים, ומידות SVG נכונות
+    // כי רק אז לקונטיינר יש גודל אמיתי על המסך).
     window.__sceneDataWhite_build = function () {
       buildDataPoster(document.getElementById('dataWhiteLayer'));
-    };
-    window.__sceneDataVideo_build = function () {
-      buildDataPoster(document.getElementById('dataVideoLayer'));
     };
   })();
 
@@ -2920,8 +2755,7 @@
       document.getElementById('sceneSession'),
       document.getElementById('sceneSpectrum'),
       document.getElementById('sceneShowcase'),
-      document.getElementById('sceneDataWhite'),
-      document.getElementById('sceneDataVideo')
+      document.getElementById('sceneDataWhite')
     ];
     var current = 0;
 
@@ -2938,7 +2772,6 @@
       if (scenes[current].id === 'sceneSpectrum' && window.__sceneSpectrum_place) window.__sceneSpectrum_place();
       if (scenes[current].id === 'sceneShowcase' && window.__sceneShowcase_start) window.__sceneShowcase_start();
       if (scenes[current].id === 'sceneDataWhite' && window.__sceneDataWhite_build) window.__sceneDataWhite_build();
-      if (scenes[current].id === 'sceneDataVideo' && window.__sceneDataVideo_build) window.__sceneDataVideo_build();
     });
   })();
 </script>
