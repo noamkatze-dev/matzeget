@@ -1,957 +1,1305 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Visual Analysis — Auto Demo</title>
-<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
 <style>
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-body { background:#ffffff; overflow:hidden; width:100vw; height:100vh; cursor:none; font-family:'Heebo',sans-serif; }
-#scene { width:100vw; height:100vh; display:flex; align-items:center; justify-content:center; }
-#videoWrapper { position:relative; width:100vw; height:100vh; overflow:hidden; }
-#mainVideo { display:block; width:100%; height:100%; object-fit:cover; }
-#dotCanvas { position:absolute; inset:0; pointer-events:none; z-index:1; }
-#annLayer  { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:2; transition:opacity 0.3s; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+  }
 
-.ann {
-  position:absolute;
-  font-family:'Heebo',sans-serif;
-  font-size:11px; font-weight:700;
-  color:#e01a00;
-  letter-spacing:0.06em;
-  white-space:nowrap;
-  text-shadow:none;
-  pointer-events:none;
-  opacity:0;
-  transition:opacity 0.5s ease, filter 0.5s ease;
-}
+  .scene {
+    display: none;
+    position: fixed;
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+  }
+  .scene.active { display: flex; }
 
-#gazeDot {
-  position:fixed; width:22px; height:22px; border-radius:50%;
-  border:2px solid rgba(224,26,0,0.85);
-  background:rgba(224,26,0,0.12);
-  transform:translate(-50%,-50%); pointer-events:none; z-index:50;
-}
+  /* ── SCENE A: video + dots ── */
+  #sceneA-stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: #c8e8f5;
+  }
 
-/* ── mode indicator (replaces the mode-selection UI, since this runs unattended) ── */
-#modeIndicator {
-  position:fixed; bottom:16px; right:16px; z-index:60;
-  font-family:'Heebo',sans-serif; font-size:10px; font-weight:700;
-  letter-spacing:0.18em; color:#111111;
-  background:#ffffff; border:1.5px solid #dddddd; padding:10px 16px;
-  display:flex; align-items:center; gap:8px; white-space:nowrap;
-}
-#modeIndicator .dot { color:#e01a00; font-size:8px; }
-#modeIndicator .idx { color:#bbbbbb; font-weight:400; }
+  #bgVideo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+  }
+
+  #dotsLayer {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .dot {
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    border-radius: 50%;
+    background: #FF0000;
+    opacity: 0;
+    animation: dotPulse var(--dur, 3.4s) ease-in-out infinite;
+    animation-delay: var(--delay, 0s);
+  }
+
+  @keyframes dotPulse {
+    0%   { opacity: 0; }
+    18%  { opacity: 0; }
+    20%  { opacity: 1; }
+    55%  { opacity: 1; }
+    80%  { opacity: 0; }
+    100% { opacity: 0; }
+  }
+
+  /* ── SCENE B: p5 video edge-analysis ── */
+  #sceneB {
+    background: #ffffff;
+  }
+  #sceneB canvas {
+    display: block;
+  }
+
+  /* ── SCENE C: sobel analysis + auto-simulated gaze reveal ── */
+  #sceneC {
+    background: #ffffff;
+    cursor: none;
+  }
+  #sceneC canvas.p5-video-canvas {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+  #sceneC-dotCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+  }
+  #sceneC-annLayer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 6;
+  }
+  #sceneC-annLayer .ann {
+    position: absolute;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: #ff1500;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    text-shadow: none;
+    pointer-events: none;
+    opacity: 0;
+  }
+  #sceneC-gazeDot {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 3px solid rgba(255,21,0,0.85);
+    box-shadow: none;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 50;
+    display: none;
+  }
+
+  /* ── SCENE D: six simultaneous analysis panels ── */
+  #sceneD {
+    background: #ffffff;
+    overflow-y: auto;
+    align-items: flex-start;
+  }
+  #sceneD-wrap {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 30px 20px 50px;
+    width: 100%;
+  }
+  #sceneD-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+  #sceneD .sceneD-panel {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #eee;
+    overflow: hidden;
+    background: #fff;
+  }
+  #sceneD .sceneD-panel-canvas-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background: #ffffff;
+    overflow: hidden;
+  }
+  #sceneD .sceneD-panel-canvas-wrap canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
 </style>
 </head>
 <body>
 
-<div id="scene">
-  <div id="videoWrapper">
-    <video id="mainVideo" src="statue.mp4" autoplay loop muted playsinline></video>
-    <canvas id="dotCanvas"></canvas>
-    <div id="annLayer"></div>
+<!-- SCENE A -->
+<div id="sceneA" class="scene active">
+  <div id="sceneA-stage">
+    <video id="bgVideo" autoplay muted loop playsinline>
+      <source src="sky.mp4" type="video/mp4">
+    </video>
+    <div id="dotsLayer"></div>
   </div>
 </div>
 
-<div id="gazeDot"></div>
+<!-- SCENE B -->
+<div id="sceneB" class="scene"></div>
 
-<div id="modeIndicator">
-  <span class="dot">●</span>
-  <span id="modeIndicatorName">GAZE POINT</span>
-  <span class="idx" id="modeIndicatorIdx">01 / 06</span>
+<!-- SCENE C -->
+<div id="sceneC" class="scene" style="position:fixed;">
+  <canvas id="sceneC-dotCanvas"></canvas>
+  <div id="sceneC-annLayer"></div>
+  <div id="sceneC-gazeDot"></div>
 </div>
 
-<!-- hidden canvases for analysis -->
-<canvas id="anaC" style="display:none" width="160" height="90"></canvas>
-<canvas id="preC" style="display:none" width="160" height="90"></canvas>
-<canvas id="aoiC" style="display:none" width="320" height="180"></canvas>
-<canvas id="aoiP" style="display:none" width="320" height="180"></canvas>
+<!-- SCENE D -->
+<div id="sceneD" class="scene">
+  <div id="sceneD-wrap">
+    <div id="sceneD-grid"></div>
+  </div>
+  <video id="sceneD-srcVideo" src="statue.mp4" autoplay muted loop playsinline style="display:none"></video>
+  <canvas id="sceneD-anaC" width="160" height="90" style="display:none"></canvas>
+  <canvas id="sceneD-preC" width="160" height="90" style="display:none"></canvas>
+  <canvas id="sceneD-aoiC" width="320" height="180" style="display:none"></canvas>
+</div>
 
 <script>
-'use strict';
+  // ═══════════════════════════════════════════════════════════════
+  // SCENE A — video + red grid dots
+  // ═══════════════════════════════════════════════════════════════
+  (function () {
+    var vid = document.getElementById('bgVideo');
+    function slowDown() { vid.playbackRate = 0.6; }
+    slowDown();
+    vid.addEventListener('loadedmetadata', slowDown);
+    vid.addEventListener('play', slowDown);
 
-/* ══════════════════════════════════════════════════════════════════════
-   CONSTANTS
-   ══════════════════════════════════════════════════════════════════════ */
+    var DOT_COUNT = 70;
+    var MIN_DUR = 2.5, MAX_DUR = 5.5;
+    var MAX_DELAY = 5;
 
-const W_ANA        = 160;
-const H_ANA        = 90;
-const N_ANN        = 250;
-const DOT_STEP     = 2;
-const DOT_THRESH   = 10;
-const ANA_INTERVAL = 600;
-const REVEAL_FRAC  = 0.030;
-const DOT_FADE_MS  = 5000;
-const W_AOI        = 320;
-const H_AOI        = 180;
-const AOI_INTERVAL = 900;
-const MAX_AOI      = 16;
-const AOI_FADE_MS  = 5000;
-const CLUSTER_DIST = 0.07;
-const AOI_MIN_W    = 0.04;
-const AOI_MIN_H    = 0.03;
-const AOI_MAX_SIZE = 0.40;
+    var layer = document.getElementById('dotsLayer');
+    var frag = document.createDocumentFragment();
 
-const FIX_DISPERSION   = 0.04;
-const FIX_MIN_DURATION = 150;
-const SAC_VELOCITY     = 0.8;
-const SAC_MIN_AMP      = 0.03;
-const W_HEAT = 200, H_HEAT = 112;
-const HEAT_SIGMA  = 0.07;
-const HEAT_WEIGHT = 0.18;
-const HEAT_DECAY  = 0.9975;
-
-const GAZE_LERP  = 0.08;
-const CAL_VAR_THRESH = 0.0012;
-const BUF_MAX = 30;
-
-/* ── simulated (automatic) gaze parameters — replaces head/mouse tracking ── */
-const SIM_MIN_DWELL  = 1400;
-const SIM_MAX_DWELL  = 3200;
-const SIM_DRIFT_LERP = 0.02;
-
-/* ── auto mode cycling ── */
-const MODE_ORDER = ['GAZE', 'FIXATION', 'SACCADE', 'SCANPATH', 'HEATMAP', 'FIRSTFIX'];
-const MODE_LABELS = {
-  GAZE:     'GAZE POINT',
-  FIXATION: 'FIXATION',
-  SACCADE:  'SACCADE',
-  SCANPATH: 'SCAN PATH',
-  HEATMAP:  'HEATMAP',
-  FIRSTFIX: 'FIRST FIXATION'
-};
-const MODE_DWELL_MS = 9000; // כמה זמן כל מצב מוצג לפני שהוא עובר לבא
-
-/* ══════════════════════════════════════════════════════════════════════
-   DOM
-   ══════════════════════════════════════════════════════════════════════ */
-
-const mainVideo    = document.getElementById('mainVideo');
-const videoWrapper = document.getElementById('videoWrapper');
-const dotCanvas    = document.getElementById('dotCanvas');
-const dotCtx       = dotCanvas.getContext('2d');
-const annLayer     = document.getElementById('annLayer');
-const gazeDot      = document.getElementById('gazeDot');
-
-const anaCtx  = document.getElementById('anaC').getContext('2d', { willReadFrequently:true });
-const preCtx  = document.getElementById('preC').getContext('2d', { willReadFrequently:true });
-const aoiCtx  = document.getElementById('aoiC').getContext('2d', { willReadFrequently:true });
-const aoiPCtx = document.getElementById('aoiP').getContext('2d', { willReadFrequently:true });
-
-const modeIndicatorName = document.getElementById('modeIndicatorName');
-const modeIndicatorIdx  = document.getElementById('modeIndicatorIdx');
-
-/* ══════════════════════════════════════════════════════════════════════
-   STATE
-   ══════════════════════════════════════════════════════════════════════ */
-
-let activeMode = 'GAZE';
-
-let dotPool  = [];
-let aoiPool  = [];
-let prevPx   = null;
-let lastAnaTs = -9999;
-let lastAoiTs = -9999;
-
-let fixationHistory = [];
-let currentFixation = null;
-let scanPathHistory = [];
-let saccadeHistory  = [];
-let saccadeActive   = false;
-let saccadeStart    = null;
-let heatmap         = new Float32Array(W_HEAT * H_HEAT);
-let heatCanvas, heatCtx;
-let firstFix        = null;
-let firstFixDone    = false;
-let firstFixModeTs  = 0;
-let sessionStartTs  = 0;
-
-let rawGX = 0.5, rawGY = 0.5;
-let sGX   = 0.5, sGY   = 0.5;
-let gazeOn     = true; // תמיד "פעיל" - אין המתנה לגישת מצלמה
-let lastGazeTs = 0;
-
-// offXBuf/offYBuf כאן משמשים למדידת "יציבות" של המבט המדומה עצמו
-// (עד כמה הוא נייח כרגע) - באותה צורה שבה שימשו במקור למדידת יציבות הראש.
-const offXBuf = [], offYBuf = [];
-
-window._gazeHistory = [];
-window._dotPts      = null;
-
-/* ── מטרת המבט המדומה הנוכחית ── */
-let simGX = 0.5, simGY = 0.5;
-
-/* ══════════════════════════════════════════════════════════════════════
-   SHARED STABILITY + CLASSIFIER
-   ══════════════════════════════════════════════════════════════════════ */
-
-function currentStability() {
-  const N = Math.min(offXBuf.length, 20);
-  if (N < 8) return 0;
-  const xs = offXBuf.slice(-N), ys = offYBuf.slice(-N);
-  const mx = xs.reduce((a,b) => a+b, 0) / N;
-  const my = ys.reduce((a,b) => a+b, 0) / N;
-  const vx = xs.reduce((a,b) => a+(b-mx)**2, 0) / N;
-  const vy = ys.reduce((a,b) => a+(b-my)**2, 0) / N;
-  return Math.max(0, Math.min(1, 1 - (vx+vy) / CAL_VAR_THRESH));
-}
-
-function detectSearchPattern() {
-  const h = window._gazeHistory;
-  if (h.length < 6) return false;
-  const recent = h.slice(-6);
-  const dxs = [], dys = [];
-  for (let i = 1; i < recent.length; i++) {
-    dxs.push(recent[i].x - recent[i-1].x);
-    dys.push(recent[i].y - recent[i-1].y);
-  }
-  const avgDx = dxs.reduce((a,b) => a+b, 0) / dxs.length;
-  const avgDy = dys.reduce((a,b) => a+b, 0) / dys.length;
-  const cX = dxs.every(d => Math.sign(d) === Math.sign(avgDx));
-  const cY = dys.every(d => Math.sign(d) === Math.sign(avgDy));
-  return (Math.abs(avgDx) > 0.02 || Math.abs(avgDy) > 0.02) && (cX || cY);
-}
-
-function classify(a, ts, scanSpeed, microMovement) {
-  const stab = currentStability();
-  if (a.dwellTime > 900 && stab > 0.75)                             return 'ATTENTION LOCKED';
-  if (a.revisitCount >= 2 && a.totalDwellTime > 900)                return 'REPEATED GLANCE';
-  if (a.revisitCount >= 2 && a.totalDwellTime < 900 && stab < 0.5) return 'FOCUS UNSTABLE';
-  if (a.dwellTime > 500 && stab < 0.4 && microMovement > 0.015)    return 'VISUAL DRIFT';
-  if (scanSpeed > 8 && a.dwellTime < 150 && stab < 0.3)            return 'SCAN WITHOUT PROCESSING';
-  if (a.dwellTime > 200 && a.dwellTime < 700 && stab < 0.6)        return 'LOW ENGAGEMENT';
-  if (detectSearchPattern() && scanSpeed >= 2)                      return 'SEARCH PATTERN';
-  return 'UNCLASSIFIED';
-}
-
-/* ══════════════════════════════════════════════════════════════════════
-   GAZE MODE — SOBEL DOT POOL
-   ══════════════════════════════════════════════════════════════════════ */
-
-function buildDotPool() {
-  annLayer.innerHTML = '';
-  dotPool = [];
-  for (let i = 0; i < N_ANN; i++) {
-    const el = document.createElement('span');
-    el.className = 'ann';
-    annLayer.appendChild(el);
-    const jitterX = ((i * 137.508) % 1 - 0.5) * 0.06;
-    const jitterY = ((i * 97.314)  % 1 - 0.5) * 0.03;
-    dotPool.push({
-      el,
-      x:0.5, y:0.5, jitterX, jitterY, labelX:0.5, labelY:0.5,
-      active:false, visible:false, shownAt:0,
-      state:'UNCLASSIFIED',
-      dwellTime:0, totalDwellTime:0, revisitCount:0, lastVisitTs:0,
-      timeBetweenVisits:0, isNear:false, visitDwells:[],
-      _visitStart:0, _lastClassifyTs:0,
-      classificationBuffer:[], classificationStableTime:0, stableFor:0
-    });
-  }
-}
-
-function sobel(px, w, h) {
-  const g  = new Float32Array(w * h);
-  const mg = new Float32Array(w * h);
-  for (let i = 0; i < w * h; i++) {
-    const o = i * 4;
-    g[i] = 0.299 * px[o] + 0.587 * px[o+1] + 0.114 * px[o+2];
-  }
-  for (let y = 1; y < h-1; y++) {
-    for (let x = 1; x < w-1; x++) {
-      const i  = y*w+x;
-      const tl = g[i-w-1], tc = g[i-w], tr = g[i-w+1];
-      const ml = g[i-1],               mr = g[i+1];
-      const bl = g[i+w-1], bc = g[i+w], br = g[i+w+1];
-      mg[i] = Math.hypot((tr+2*mr+br)-(tl+2*ml+bl), (bl+2*bc+br)-(tl+2*tc+tr));
+    for (var i = 0; i < DOT_COUNT; i++) {
+      var dot = document.createElement('span');
+      dot.className = 'dot';
+      var x = (Math.random() * 100).toFixed(2) + '%';
+      var y = (Math.random() * 100).toFixed(2) + '%';
+      var delay = (Math.random() * MAX_DELAY).toFixed(2) + 's';
+      var dur = (MIN_DUR + Math.random() * (MAX_DUR - MIN_DUR)).toFixed(2) + 's';
+      dot.style.setProperty('--x', x);
+      dot.style.setProperty('--y', y);
+      dot.style.setProperty('--delay', delay);
+      dot.style.setProperty('--dur', dur);
+      frag.appendChild(dot);
     }
-  }
-  return mg;
-}
+    layer.appendChild(frag);
+  })();
 
-function analyzeDots() {
-  if (mainVideo.readyState < 2) return;
-  anaCtx.drawImage(mainVideo, 0, 0, W_ANA, H_ANA);
-  const id = anaCtx.getImageData(0, 0, W_ANA, H_ANA);
-  const mg = sobel(id.data, W_ANA, H_ANA);
+  // ═══════════════════════════════════════════════════════════════
+  // SCENE B — p5.js video edge-detection analysis (instance mode)
+  // ═══════════════════════════════════════════════════════════════
+  new p5(function (p) {
 
-  const all = [];
-  for (let y = 1; y < H_ANA-1; y += DOT_STEP) {
-    for (let x = 1; x < W_ANA-1; x += DOT_STEP) {
-      const i = y * W_ANA + x;
-      if (mg[i] >= DOT_THRESH) all.push({ i, mag: mg[i] });
-    }
-  }
-  all.sort((a,b) => b.mag - a.mag);
-  if (all.length > N_ANN) all.length = N_ANN;
+    let video;
+    let previousFrame;
 
-  const pts = [];
-  for (const { i } of all) {
-    pts.push({
-      nx: Math.max(0.01, Math.min(0.99, (i % W_ANA) / W_ANA)),
-      ny: Math.max(0.01, Math.min(0.99, Math.floor(i / W_ANA) / H_ANA))
-    });
-  }
-  window._dotPts = pts;
+    let analyzedData = {};
+    let edgeTexts = [];
 
-  const n = Math.min(pts.length, N_ANN);
-  for (let i = 0; i < N_ANN; i++) {
-    const a = dotPool[i];
-    if (i < n) {
-      const p = pts[i];
-      a.active = true;
-      if (!a.visible) {
-        const moved = Math.hypot(a.x - p.nx, a.y - p.ny) > 0.05;
-        if (moved) {
-          a.dwellTime=0; a.totalDwellTime=0; a.revisitCount=0;
-          a.lastVisitTs=0; a.timeBetweenVisits=0; a.isNear=false;
-          a.visitDwells=[]; a._visitStart=0; a._lastClassifyTs=0;
-          a.classificationBuffer=[]; a.classificationStableTime=0; a.stableFor=0;
-          a.shownAt=0;
-        }
-        a.x = p.nx; a.y = p.ny;
-        a.labelX = Math.max(0.01, Math.min(0.99, p.nx + a.jitterX));
-        a.labelY = Math.max(0.01, Math.min(0.99, p.ny + a.jitterY));
+    let videoW = 1;
+    let videoH = 1;
+
+    const FINAL_CANVAS_WIDTH = 270;
+    const FINAL_CANVAS_HEIGHT = 480;
+
+    p.preload = function () {
+      video = p.createVideo(['CCCC.mp4']);
+    };
+
+    p.setup = function () {
+      const cnv = p.createCanvas(FINAL_CANVAS_WIDTH, FINAL_CANVAS_HEIGHT);
+      cnv.parent('sceneB');
+
+      video.hide();
+      video.volume(0);
+      video.loop();
+
+      video.elt.onloadeddata = () => {
+        videoW = video.width;
+        videoH = video.height;
+        previousFrame = p.createGraphics(videoW, videoH);
+        console.log('VIDEO READY');
+      };
+
+      analyzedData = {
+        timestamp: '0.000',
+        edges: 0,
+        shapes: { circles: 0, lines: 0, corners: 0, curves: 0 },
+        motion: { intensity: 0, direction: 'סטטי', rotationSpeed: 0, stability: 100 },
+        composition: { brightness: 0, contrast: 'נמוך', balance: 'מאוזן', saturation: 0 },
+        cameraAngle: 'ישירה'
+      };
+    };
+
+    p.draw = function () {
+      // רקע לבן במקום שחור
+      p.background(255);
+
+      if (!video || videoW === 0 || videoH === 0) return;
+
+      // ── CONTAIN SCALE — הווידאו מוצג באמצע, בשלמותו, בלי חיתוך ──
+      let canvasRatio = p.width / p.height;
+      let videoRatio = videoW / videoH;
+
+      let drawW, drawH, offsetX, offsetY;
+
+      if (videoRatio > canvasRatio) {
+        drawW = p.width;
+        drawH = drawW / videoRatio;
+        offsetX = 0;
+        offsetY = (p.height - drawH) / 2;
+      } else {
+        drawH = p.height;
+        drawW = videoRatio * drawH;
+        offsetX = (p.width - drawW) / 2;
+        offsetY = 0;
       }
-    } else {
-      a.active = false;
-      if (!a.visible) { a.el.textContent = ''; a.el.style.opacity = '0'; a.el.style.filter = 'none'; }
+
+      p.image(video, offsetX, offsetY, drawW, drawH);
+
+      analyzeFrame(offsetX, offsetY, drawW, drawH);
+
+      for (let edge of edgeTexts) {
+        p.fill(255, 0, 0);
+        p.noStroke();
+        p.textSize(6);
+        p.textAlign(p.CENTER, p.CENTER);
+        p.text(edge.text, edge.sx, edge.sy);
+      }
+    };
+
+    function analyzeFrame(offsetX, offsetY, drawW, drawH) {
+      video.loadPixels();
+      if (video.pixels.length === 0) return;
+
+      edgeTexts = [];
+
+      let edges = detectEdges(offsetX, offsetY, drawW, drawH);
+      let shapes = detectShapes(edges);
+      let motion = analyzeMotion();
+      let composition = analyzeComposition();
+      let cameraAngle = detectCameraAngle(edges);
+
+      analyzedData = {
+        timestamp: video.time().toFixed(3),
+        edges: edges.length,
+        shapes,
+        motion,
+        composition,
+        cameraAngle
+      };
+
+      sampleAndLabelStrongEdges(edges, offsetX, offsetY, drawW, drawH);
     }
-  }
 
-  preCtx.drawImage(mainVideo, 0, 0, W_ANA, H_ANA);
-  prevPx = preCtx.getImageData(0, 0, W_ANA, H_ANA).data.slice();
-}
+    function sampleAndLabelStrongEdges(edges, offsetX, offsetY, drawW, drawH) {
+      const strongEdgeThreshold = 110;
+      let sampleCount = 0;
+      const sampleRate = 50;
 
-function revealDot(a, label, ts) {
-  a.state = label; a.visible = true; a.shownAt = ts;
-  a.el.textContent = label;
-  a.el.style.left      = (a.labelX * 100).toFixed(2) + '%';
-  a.el.style.top       = (a.labelY * 100).toFixed(2) + '%';
-  a.el.style.transform = a.labelX > 0.62
-    ? 'translate(calc(-100% - 12px), -50%)'
-    : 'translate(12px, -50%)';
-  a.el.style.opacity = '1';
-  a.el.style.filter  = 'none';
-}
+      let composition_contrast_en = 'LOW';
+      if (analyzedData.composition.contrast === 'גבוה') composition_contrast_en = 'HIGH';
+      else if (analyzedData.composition.contrast === 'בינוני') composition_contrast_en = 'MEDIUM';
 
-function hideDot(a) {
-  a.visible = false; a.shownAt = 0;
-  a.el.style.transition = 'opacity 0.8s ease, filter 0.8s ease';
-  a.el.style.opacity    = '0';
-  a.el.style.filter     = 'blur(4px)';
-}
+      let motion_direction_en = 'STATIC';
+      if (analyzedData.motion.direction === 'מהירה') motion_direction_en = 'FAST';
+      else if (analyzedData.motion.direction === 'איטית') motion_direction_en = 'SLOW';
 
-function applyDotGaze(ts, gpx, gpy, W, H, scanSpeed, microMovement) {
-  const revR = Math.min(W, H) * REVEAL_FRAC;
-  for (const a of dotPool) {
-    if (!a.active) continue;
-    if (a.visible && a.shownAt > 0 && ts - a.shownAt > DOT_FADE_MS) { hideDot(a); continue; }
+      for (let i = 0; i < edges.length; i++) {
+        let edge = edges[i];
+        if (edge.mag > strongEdgeThreshold) {
+          if (sampleCount % sampleRate === 0) {
+            let gx = edge.gx;
+            let gy = edge.gy;
+            let angle = p.atan2(gy, gx);
+            let angleDeg = p.degrees(angle);
 
-    const d    = Math.hypot(a.x * W - gpx, a.y * H - gpy);
-    const near = d < revR;
+            let sx = offsetX + p.map(edge.x, 0, videoW, 0, drawW);
+            let sy = offsetY + p.map(edge.y, 0, videoH, 0, drawH);
 
-    if (near && !a.isNear) {
-      a.isNear = true; a.revisitCount++;
-      if (a.lastVisitTs > 0) a.timeBetweenVisits = ts - a.lastVisitTs;
-      a._visitStart = ts;
+            let label;
+            let isVertical = angleDeg > 45 && angleDeg < 135;
+            let isHorizontal =
+              angleDeg < 20 || angleDeg > 160 ||
+              (angleDeg < 0 && angleDeg > -20) ||
+              (angleDeg < -160);
+
+            if (isVertical) {
+              label = `VERTICAL / CONTRAST ${composition_contrast_en}`;
+            } else if (isHorizontal) {
+              label = `HORIZONTAL / STAB ${analyzedData.motion.stability.toFixed(0)}%`;
+            } else if (edge.mag > 150) {
+              label = `CRITICAL / MOTION ${motion_direction_en}`;
+            } else {
+              label = `DETAIL / BRIGHT ${analyzedData.composition.brightness}`;
+            }
+
+            edgeTexts.push({ sx, sy, text: label.toUpperCase() });
+          }
+          sampleCount++;
+        }
+      }
     }
-    if (near && a.isNear) {
-      a.dwellTime = ts - a._visitStart;
-      if (ts - a._lastClassifyTs > 200) {
-        a._lastClassifyTs = ts;
-        const live = classify(a, ts, scanSpeed, microMovement);
-        if (live !== 'UNCLASSIFIED') {
-          a.classificationBuffer.push(live);
-          if (a.classificationBuffer.length > 5) a.classificationBuffer.shift();
-          const consistent = a.classificationBuffer.every(v => v === live);
-          consistent ? (a.classificationStableTime += 200) : (a.classificationStableTime = 0);
-          if (!a.visible && a.classificationStableTime > 250) revealDot(a, live, ts);
-          else if (a.visible && live !== a.state && a.classificationStableTime > 250) {
-            a.state = live; a.el.textContent = live;
+
+    function detectEdges(offsetX, offsetY, drawW, drawH) {
+      let edges = [];
+      let threshold = 200;
+      let step = 4;
+
+      for (let y = step; y < videoH - step; y += step) {
+        for (let x = step; x < videoW - step; x += step) {
+          let gx =
+            -1 * getPixelBrightness(x - step, y - step) +
+             1 * getPixelBrightness(x + step, y - step) +
+            -2 * getPixelBrightness(x - step, y) +
+             2 * getPixelBrightness(x + step, y) +
+            -1 * getPixelBrightness(x - step, y + step) +
+             1 * getPixelBrightness(x + step, y + step);
+
+          let gy =
+            -1 * getPixelBrightness(x - step, y - step) +
+            -2 * getPixelBrightness(x, y - step) +
+            -1 * getPixelBrightness(x + step, y - step) +
+             1 * getPixelBrightness(x - step, y + step) +
+             2 * getPixelBrightness(x, y + step) +
+             1 * getPixelBrightness(x + step, y + step);
+
+          let magnitude = p.sqrt(gx * gx + gy * gy);
+
+          if (magnitude > threshold) {
+            edges.push({ x, y, mag: magnitude, gx, gy });
+            drawEdgePoint(x, y, offsetX, offsetY, drawW, drawH);
           }
         }
       }
+      return edges;
     }
-    if (!near && a.isNear) {
-      a.isNear = false;
-      a.visitDwells.push(a.dwellTime);
-      a.totalDwellTime += a.dwellTime;
-      a.lastVisitTs = ts; a.dwellTime = 0;
-      if (!a.visible) {
-        const exitState = classify(a, ts, scanSpeed, microMovement);
-        if (exitState !== 'UNCLASSIFIED') revealDot(a, exitState, ts);
+
+    function drawEdgePoint(x, y, offsetX, offsetY, drawW, drawH) {
+      let sx = offsetX + p.map(x, 0, videoW, 0, drawW);
+      let sy = offsetY + p.map(y, 0, videoH, 0, drawH);
+      p.stroke(255, 0, 0, 120);
+      p.strokeWeight(1);
+      p.point(sx, sy);
+    }
+
+    function getPixelBrightness(x, y) {
+      if (x < 0 || x >= videoW || y < 0 || y >= videoH) return 0;
+      let idx = (p.floor(y) * videoW + p.floor(x)) * 4;
+      return (video.pixels[idx] + video.pixels[idx + 1] + video.pixels[idx + 2]) / 3;
+    }
+
+    function detectShapes(edges) {
+      let shapes = { circles: 0, lines: 0, corners: 0, curves: 0 };
+      shapes.lines = p.floor(edges.length / 300);
+      shapes.circles = p.floor(edges.length / 500);
+      shapes.corners = p.floor(edges.length / 200);
+      shapes.curves = p.floor(edges.length / 400);
+      return shapes;
+    }
+
+    function analyzeMotion() {
+      let motion = { intensity: 0, direction: 'סטטי', rotationSpeed: 0, stability: 100 };
+      if (!previousFrame) return motion;
+
+      previousFrame.loadPixels();
+
+      let totalDiff = 0;
+      let sampledPixels = 0;
+      let step = 10;
+
+      for (let y = 0; y < videoH; y += step) {
+        for (let x = 0; x < videoW; x += step) {
+          let idx = (y * videoW + x) * 4;
+
+          let currentBrightness =
+            (video.pixels[idx] + video.pixels[idx + 1] + video.pixels[idx + 2]) / 3;
+
+          let prevBrightness =
+            (previousFrame.pixels[idx] + previousFrame.pixels[idx + 1] + previousFrame.pixels[idx + 2]) / 3;
+
+          totalDiff += p.abs(currentBrightness - prevBrightness);
+          sampledPixels++;
+        }
       }
-    }
-  }
-}
 
-/* ══════════════════════════════════════════════════════════════════════
-   GAZE MODE — AOI REGIONS
-   ══════════════════════════════════════════════════════════════════════ */
+      if (sampledPixels > 0) {
+        let avgDiff = totalDiff / sampledPixels;
 
-function sobelMag(px, w, h) {
-  const g  = new Float32Array(w * h);
-  const mg = new Float32Array(w * h);
-  for (let i = 0; i < w*h; i++) {
-    const o = i * 4;
-    g[i] = 0.299 * px[o] + 0.587 * px[o+1] + 0.114 * px[o+2];
-  }
-  for (let y = 1; y < h-1; y++) {
-    for (let x = 1; x < w-1; x++) {
-      const i  = y*w+x;
-      const tl = g[i-w-1], tc = g[i-w], tr = g[i-w+1];
-      const ml = g[i-1],               mr = g[i+1];
-      const bl = g[i+w-1], bc = g[i+w], br = g[i+w+1];
-      mg[i] = Math.hypot((tr+2*mr+br)-(tl+2*ml+bl), (bl+2*bc+br)-(tl+2*tc+tr));
-    }
-  }
-  return mg;
-}
+        motion.intensity = p.constrain(avgDiff * 2, 0, 100);
+        motion.rotationSpeed = (avgDiff / 10).toFixed(1);
+        motion.stability = p.constrain(100 - avgDiff * 2, 0, 100);
 
-function detectAOI(px, w, h) {
-  const mg = sobelMag(px, w, h);
-  const THRESH = 20, STEP = 3;
-  const pts = [];
-  for (let y = 2; y < h-2; y += STEP) {
-    for (let x = 2; x < w-2; x += STEP) {
-      if (mg[y*w+x] >= THRESH) pts.push({ nx:x/w, ny:y/h, mag:mg[y*w+x] });
-    }
-  }
-  if (!pts.length) return [];
-  pts.sort((a,b) => b.mag - a.mag);
-
-  const used = new Uint8Array(pts.length);
-  const regions = [];
-  for (let i = 0; i < pts.length && regions.length < MAX_AOI*4; i++) {
-    if (used[i]) continue;
-    const seed = pts[i];
-    let x0=seed.nx, x1=seed.nx, y0=seed.ny, y1=seed.ny, count=1;
-    used[i] = 1;
-    for (let j = i+1; j < pts.length; j++) {
-      if (used[j]) continue;
-      if (Math.hypot(pts[j].nx-seed.nx, pts[j].ny-seed.ny) < CLUSTER_DIST) {
-        x0=Math.min(x0,pts[j].nx); x1=Math.max(x1,pts[j].nx);
-        y0=Math.min(y0,pts[j].ny); y1=Math.max(y1,pts[j].ny);
-        count++; used[j]=1;
+        if (avgDiff > 20) motion.direction = 'מהירה';
+        else if (avgDiff > 5) motion.direction = 'איטית';
+        else motion.direction = 'סטטי';
       }
-    }
-    if (count < 4) continue;
-    const pad=0.022;
-    const rx=Math.max(0,x0-pad), ry=Math.max(0,y0-pad);
-    const rw=Math.min(1,x1+pad)-rx, rh=Math.min(1,y1+pad)-ry;
-    if (rw<AOI_MIN_W || rh<AOI_MIN_H || rw>AOI_MAX_SIZE || rh>AOI_MAX_SIZE) continue;
-    regions.push({ x:rx,y:ry,w:rw,h:rh,cx:rx+rw/2,cy:ry+rh/2 });
-  }
-  const kept = [];
-  for (const r of regions) {
-    let dup = false;
-    for (const k of kept) {
-      if (Math.hypot(r.cx-k.cx,r.cy-k.cy) < CLUSTER_DIST*1.4) { dup=true; break; }
-    }
-    if (!dup) kept.push(r);
-    if (kept.length >= MAX_AOI) break;
-  }
-  return kept;
-}
 
-function analyzeAOI() {
-  if (mainVideo.readyState < 2) return;
-  aoiCtx.drawImage(mainVideo, 0, 0, W_AOI, H_AOI);
-  const id      = aoiCtx.getImageData(0, 0, W_AOI, H_AOI);
-  const regions = detectAOI(id.data, W_AOI, H_AOI);
-  const newPool = [];
-
-  for (const r of regions) {
-    let matched=null, bestD=999;
-    for (const a of aoiPool) {
-      const d = Math.hypot(r.cx-(a.x+a.w/2), r.cy-(a.y+a.h/2));
-      if (d < bestD && d < CLUSTER_DIST*1.3) { bestD=d; matched=a; }
+      previousFrame.image(video, 0, 0);
+      return motion;
     }
-    if (matched) {
-      matched.x=r.x; matched.y=r.y; matched.w=r.w; matched.h=r.h;
-      matched.cx=r.cx; matched.cy=r.cy; matched.active=true;
-      newPool.push(matched);
-    } else {
-      const el = document.createElement('span');
-      el.className = 'ann';
-      annLayer.appendChild(el);
-      newPool.push({
-        el, x:r.x,y:r.y,w:r.w,h:r.h,cx:r.cx,cy:r.cy,
-        active:true, visible:false, state:'UNCLASSIFIED', shownAt:0,
-        dwellTime:0, totalDwellTime:0, revisitCount:0, lastVisitTs:0,
-        timeBetweenVisits:0, isInside:false, visitDwells:[],
-        _visitStart:0, _lastClassifyTs:0,
-        classificationBuffer:[], classificationStableTime:0, stableFor:0
-      });
-    }
-  }
-  for (const a of aoiPool) { if (!newPool.includes(a)) a.el.remove(); }
-  aoiPool = newPool;
-  aoiPCtx.drawImage(mainVideo, 0, 0, W_AOI, H_AOI);
-}
 
-function revealAOI(a, label, ts) {
-  a.state=label; a.visible=true; a.shownAt=ts;
-  a.el.textContent=label;
-  const edgeX = a.x + a.w;
-  const W=dotCanvas.width, H=dotCanvas.height;
-  let myPxY = (a.y + a.h*0.5) * H;
-  const myPxX = edgeX * W;
-  for (const b of aoiPool) {
-    if (b===a || !b.visible) continue;
-    const bX=(b.x+b.w)*W, bY=(b.y+b.h*0.5)*H;
-    if (Math.abs(myPxX-bX)<80 && Math.abs(myPxY-bY)<18) myPxY += 18;
-  }
-  a.el.style.left      = (edgeX*100).toFixed(2)+'%';
-  a.el.style.top       = ((myPxY/H)*100).toFixed(2)+'%';
-  a.el.style.transform = edgeX>0.62 ? 'translate(calc(-100% - 8px),-50%)' : 'translate(8px,-50%)';
-  a.el.style.opacity='0'; a.el.style.filter='blur(4px)';
-  requestAnimationFrame(() => {
-    a.el.style.transition='opacity 0.5s ease, filter 0.5s ease';
-    a.el.style.opacity='1'; a.el.style.filter='blur(0px)';
+    function analyzeComposition() {
+      let brightness = 0;
+      let saturation = 0;
+      let sampled = 0;
+      let step = 20;
+
+      for (let y = 0; y < videoH; y += step) {
+        for (let x = 0; x < videoW; x += step) {
+          let idx = (y * videoW + x) * 4;
+          let r = video.pixels[idx];
+          let g = video.pixels[idx + 1];
+          let b = video.pixels[idx + 2];
+
+          brightness += (r + g + b) / 3;
+          saturation += p.max(r, g, b) - p.min(r, g, b);
+          sampled++;
+        }
+      }
+
+      let avgBrightness = brightness / sampled;
+      let avgSaturation = saturation / sampled;
+
+      return {
+        brightness: p.floor(avgBrightness),
+        contrast: avgBrightness > 150 ? 'גבוה' : avgBrightness > 90 ? 'בינוני' : 'נמוך',
+        balance: 'מאוזן',
+        saturation: p.floor(avgSaturation)
+      };
+    }
+
+    function detectCameraAngle(edges) {
+      if (edges.length === 0) return 'ישירה';
+
+      let vertical = 0;
+      let horizontal = 0;
+
+      for (let i = 0; i < edges.length; i++) {
+        let e = edges[i];
+        if (p.abs(e.gx) < 5 && p.abs(e.gy) > 20) vertical++;
+        if (p.abs(e.gy) < 5 && p.abs(e.gx) > 20) horizontal++;
+      }
+
+      if (vertical > horizontal * 1.5) return 'מצלמה אנכית';
+      if (horizontal > vertical * 1.5) return 'מצלמה אופקית';
+      return 'ישירה';
+    }
   });
-}
 
-function hideAOI(a) {
-  a.visible=false; a.shownAt=0;
-  a.el.style.transition='opacity 0.8s ease, filter 0.8s ease';
-  a.el.style.opacity='0'; a.el.style.filter='blur(4px)';
-}
+  // ═══════════════════════════════════════════════════════════════
+  // SCENE C — Sobel edge analysis + AUTOMATED (simulated) gaze reveal
+  // אין גישה לעכבר, אז במקום מעקב עכבר אמיתי יש כאן "מבט מדומה"
+  // שנודד לבד בין נקודות אקראיות על המסך ומגלה תוויות בדרכו.
+  // ═══════════════════════════════════════════════════════════════
+  (function () {
+    'use strict';
 
-function applyAOIGaze(ts, scanSpeed, microMovement, dt) {
-  for (const a of aoiPool) {
-    if (!a.active) continue;
-    if (a.visible && a.shownAt>0 && ts-a.shownAt>AOI_FADE_MS) { hideAOI(a); continue; }
-    const inside = sGX>a.x && sGX<a.x+a.w && sGY>a.y && sGY<a.y+a.h;
-    if (inside && !a.isInside) {
-      a.isInside=true; a.revisitCount++;
-      if (a.lastVisitTs>0) a.timeBetweenVisits=ts-a.lastVisitTs;
-      a._visitStart=ts;
+    /* ── CONSTANTS — זהה למקור ── */
+    const W_ANA       = 160;
+    const H_ANA       = 90;
+    const N_ANN       = 250;
+    const DOT_STEP    = 2;
+    const DOT_THRESH  = 10;
+    const ANA_INTERVAL   = 600;
+    const REVEAL_FRAC    = 0.030;
+    const MAX_BLUR       = 7;
+    const GAZE_LERP      = 0.10;
+    const BLUR_GROW_RATE  = 2.8;
+    const BLUR_CLEAR_RATE = 20.0;
+
+    /* ── פרמטרים של המבט המדומה ── */
+    const SIM_MIN_DWELL = 1200;   // כמה זמן מינימלי "המבט" נשאר סביב יעד (ms)
+    const SIM_MAX_DWELL = 2600;   // כמה זמן מקסימלי
+    const SIM_DRIFT_LERP = 0.02;  // קצב הנדידה האיטית לעבר היעד
+
+    const sceneEl   = document.getElementById('sceneC');
+    const dotCanvas = document.getElementById('sceneC-dotCanvas');
+    const dotCtx    = dotCanvas.getContext('2d');
+    const annLayer  = document.getElementById('sceneC-annLayer');
+    const gazeDot   = document.getElementById('sceneC-gazeDot');
+
+    const anaC   = document.createElement('canvas');
+    anaC.width   = W_ANA; anaC.height = H_ANA;
+    const anaCtx = anaC.getContext('2d', { willReadFrequently: true });
+
+    const preC   = document.createElement('canvas');
+    preC.width   = W_ANA; preC.height = H_ANA;
+    const preCtx = preC.getContext('2d', { willReadFrequently: true });
+
+    let pool      = [];
+    let prevPx    = null;
+    let rawGX = 0.5, rawGY = 0.5;
+    let sGX   = 0.5, sGY   = 0.5;
+    let lastAnaTs  = -9999;
+    let lastGazeTs = 0;
+
+    let videoEl = null;
+    let videoW  = 1, videoH = 1;
+    let renderOffX = 0, renderOffY = 0, renderW = 0, renderH = 0;
+
+    function buildPool() {
+      annLayer.innerHTML = '';
+      pool = [];
+      for (let i = 0; i < N_ANN; i++) {
+        const el = document.createElement('span');
+        el.className = 'ann';
+        annLayer.appendChild(el);
+        pool.push({ el, x: 0.5, y: 0.5, revealed: false, blurLevel: 0, active: false });
+      }
     }
-    if (inside && a.isInside) {
-      a.dwellTime=ts-a._visitStart;
-      const stab=currentStability();
-      a.stableFor = stab>0.6 ? (a.stableFor+dt*1000) : 0;
-      if (ts-a._lastClassifyTs>200) {
-        a._lastClassifyTs=ts;
-        const live=classify(a,ts,scanSpeed,microMovement);
-        if (live!=='UNCLASSIFIED') {
-          a.classificationBuffer.push(live);
-          if (a.classificationBuffer.length>5) a.classificationBuffer.shift();
-          const consistent=a.classificationBuffer.every(v=>v===live);
-          consistent ? (a.classificationStableTime+=dt*1000) : (a.classificationStableTime=0);
-          if (!a.visible && a.classificationStableTime>250) revealAOI(a,live,ts);
-          if (a.visible && live!==a.state && a.classificationStableTime>250) { a.state=live; a.el.textContent=live; }
+
+    function sizeOverlays() {
+      dotCanvas.width  = window.innerWidth;
+      dotCanvas.height = window.innerHeight;
+    }
+
+    function sobel(px, w, h) {
+      const g  = new Float32Array(w * h);
+      const gx = new Float32Array(w * h);
+      const gy = new Float32Array(w * h);
+      const mg = new Float32Array(w * h);
+      for (let i = 0; i < w * h; i++) {
+        const o = i * 4;
+        g[i] = 0.299 * px[o] + 0.587 * px[o+1] + 0.114 * px[o+2];
+      }
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const i  = y * w + x;
+          const tl = g[i-w-1], tc = g[i-w], tr = g[i-w+1];
+          const ml = g[i-1],               mr = g[i+1];
+          const bl = g[i+w-1], bc = g[i+w], br = g[i+w+1];
+          gx[i] = (tr + 2*mr + br) - (tl + 2*ml + bl);
+          gy[i] = (bl + 2*bc + br) - (tl + 2*tc + tr);
+          mg[i] = Math.hypot(gx[i], gy[i]);
+        }
+      }
+      return { gx, gy, mg };
+    }
+
+    function drawDots(pts) {
+      const W = dotCanvas.width, H = dotCanvas.height;
+      dotCtx.clearRect(0, 0, W, H);
+      dotCtx.fillStyle = 'rgba(255,21,0,0.82)';
+      dotCtx.beginPath();
+      for (const p of pts) {
+        const sx = renderOffX + p.nx * renderW;
+        const sy = renderOffY + p.ny * renderH;
+        dotCtx.rect(sx - 1, sy - 1, 2, 2);
+      }
+      dotCtx.fill();
+    }
+
+    function rStats(px, w, h, nx0, ny0, nx1, ny1) {
+      const x0 = Math.max(0, Math.floor(nx0 * w));
+      const y0 = Math.max(0, Math.floor(ny0 * h));
+      const x1 = Math.min(w - 1, Math.floor(nx1 * w));
+      const y1 = Math.min(h - 1, Math.floor(ny1 * h));
+      let sL = 0, sL2 = 0, sS = 0, n = 0;
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const o  = (y * w + x) * 4;
+          const r  = px[o]   / 255;
+          const gr = px[o+1] / 255;
+          const b  = px[o+2] / 255;
+          const mx = Math.max(r, gr, b), mn = Math.min(r, gr, b);
+          const l  = (mx + mn) * 0.5;
+          const s  = (mx === mn) ? 0 : (mx - mn) / (1 - Math.abs(2 * l - 1));
+          sL += l; sL2 += l * l; sS += s; n++;
+        }
+      }
+      if (!n) return { bright: 128, contrast: 0, sat: 0 };
+      const al = sL / n;
+      return {
+        bright:   Math.round(al * 255),
+        contrast: Math.round(Math.sqrt(Math.max(0, sL2/n - al*al)) * 255),
+        sat:      Math.round(sS / n * 100)
+      };
+    }
+
+    function rMotion(px, prev, w, h, nx0, ny0, nx1, ny1) {
+      if (!prev) return 0;
+      const x0 = Math.max(0, Math.floor(nx0 * w));
+      const y0 = Math.max(0, Math.floor(ny0 * h));
+      const x1 = Math.min(w - 1, Math.floor(nx1 * w));
+      const y1 = Math.min(h - 1, Math.floor(ny1 * h));
+      let d = 0, n = 0;
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const o = (y * w + x) * 4;
+          d += Math.abs(px[o]   - prev[o])
+             + Math.abs(px[o+1] - prev[o+1])
+             + Math.abs(px[o+2] - prev[o+2]);
+          n += 3;
+        }
+      }
+      return n ? d / n : 0;
+    }
+
+    function makeLabel(dir, mag, st, mv) {
+      if (mv > 38)           return `CRITICAL / MOTION_FAST`;
+      if (mv > 16) {
+        const s = Math.min(99, Math.max(10, Math.round(99 - mv * 2.4)));
+        return `${dir} / STAB_${s}%`;
+      }
+      if (st.contrast > 52)  return `${dir} / CONTRAST_HIGH`;
+      if (st.bright   > 178) return `DETAIL / BRIGHT_${st.bright}`;
+      if (st.bright   < 42)  return `DETAIL / DARK_${st.bright}`;
+      if (mag         > 210) return `${dir} / SHARP_${Math.round(mag / 3)}`;
+      if (st.sat      > 42)  return `${dir} / SAT_${st.sat}%`;
+      if (st.contrast > 22)  return `${dir} / CONTRAST_${st.contrast}`;
+      return `STABLE / EDGE_${Math.round(mag)}`;
+    }
+
+    function analyze() {
+      if (!videoEl || videoEl.readyState < 2) return;
+
+      try {
+        anaCtx.drawImage(videoEl, 0, 0, W_ANA, H_ANA);
+      } catch(e) { return; }
+
+      const id = anaCtx.getImageData(0, 0, W_ANA, H_ANA);
+      const px = id.data;
+      const { gx, gy, mg } = sobel(px, W_ANA, H_ANA);
+
+      const all = [];
+      for (let y = 1; y < H_ANA - 1; y += DOT_STEP) {
+        for (let x = 1; x < W_ANA - 1; x += DOT_STEP) {
+          const i = y * W_ANA + x;
+          if (mg[i] >= DOT_THRESH) all.push({ i, mag: mg[i] });
+        }
+      }
+      all.sort((a, b) => b.mag - a.mag);
+      if (all.length > N_ANN) all.length = N_ANN;
+
+      const pts = [];
+      const m = 0.06;
+
+      for (const { i, mag } of all) {
+        const bx = i % W_ANA, by = Math.floor(i / W_ANA);
+        const nx = bx / W_ANA, ny = by / H_ANA;
+
+        const st = rStats(px, W_ANA, H_ANA, nx-m, ny-m, nx+m, ny+m);
+        const mv = rMotion(px, prevPx, W_ANA, H_ANA, nx-m, ny-m, nx+m, ny+m);
+
+        const agx = Math.abs(gx[i]), agy = Math.abs(gy[i]);
+        const a   = ((Math.atan2(gy[i], gx[i]) * 180 / Math.PI) % 180 + 180) % 180;
+
+        let dir;
+        if      (agx > 90 && agy > 90)  dir = 'CORNER';
+        else if (a < 25 || a >= 155)     dir = 'HORIZONTAL';
+        else if (a >= 65 && a < 115)     dir = 'VERTICAL';
+        else                             dir = 'DIAGONAL';
+
+        pts.push({
+          nx:    Math.max(0.01, Math.min(0.99, nx)),
+          ny:    Math.max(0.01, Math.min(0.99, ny)),
+          label: makeLabel(dir, mag, st, mv)
+        });
+      }
+
+      drawDots(pts);
+
+      const n = Math.min(pts.length, N_ANN);
+      for (let i = 0; i < N_ANN; i++) {
+        const a = pool[i];
+        if (i < n) {
+          const p = pts[i];
+          a.active = true;
+          if (!a.revealed) {
+            a.x = p.nx;
+            a.y = p.ny;
+            a.blurLevel = 0;
+            a.el.style.opacity = '0';
+            a.el.style.filter  = 'none';
+            const sx = renderOffX + p.nx * renderW;
+            const sy = renderOffY + p.ny * renderH;
+            a.el.style.left = sx + 'px';
+            a.el.style.top  = sy + 'px';
+            a.el.style.transform = (sx / window.innerWidth) > 0.62
+              ? 'translate(calc(-100% - 12px), -50%)'
+              : 'translate(12px, -50%)';
+          }
+          a.el.textContent = p.label;
+        } else {
+          a.active = false; a.revealed = false; a.blurLevel = 0;
+          a.el.textContent = '';
+          a.el.style.opacity = '0';
+          a.el.style.filter  = 'none';
+        }
+      }
+
+      preCtx.drawImage(videoEl, 0, 0, W_ANA, H_ANA);
+      prevPx = preCtx.getImageData(0, 0, W_ANA, H_ANA).data.slice();
+    }
+
+    function applyGaze(ts) {
+      const dt = lastGazeTs ? Math.min((ts - lastGazeTs) / 1000, 0.05) : 0;
+      lastGazeTs = ts;
+
+      // נדידה איטית לעבר יעד המבט המדומה הנוכחי (simGX/simGY),
+      // ואז אותו lerp שהיה קיים במקור מיישר את "העין" (sGX/sGY) אחריה
+      rawGX += (simGX - rawGX) * SIM_DRIFT_LERP;
+      rawGY += (simGY - rawGY) * SIM_DRIFT_LERP;
+
+      sGX += (rawGX - sGX) * GAZE_LERP;
+      sGY += (rawGY - sGY) * GAZE_LERP;
+
+      const W = window.innerWidth, H = window.innerHeight;
+      const gpx = sGX * W, gpy = sGY * H;
+
+      gazeDot.style.left = gpx + 'px';
+      gazeDot.style.top  = gpy + 'px';
+
+      const revR = Math.min(W, H) * REVEAL_FRAC;
+
+      for (const a of pool) {
+        if (!a.active || !a.el.textContent) continue;
+
+        const dsx = renderOffX + a.x * renderW;
+        const dsy = renderOffY + a.y * renderH;
+        const d   = Math.hypot(dsx - gpx, dsy - gpy);
+        const near = d < revR;
+
+        if (near) {
+          if (!a.revealed) { a.revealed = true; a.blurLevel = 0; }
+          a.blurLevel = Math.max(0, a.blurLevel - BLUR_CLEAR_RATE * dt);
+          a.el.style.opacity = '1';
+          a.el.style.filter  = 'none';
+        } else if (a.revealed) {
+          a.blurLevel = Math.min(MAX_BLUR, a.blurLevel + BLUR_GROW_RATE * dt);
+          a.el.style.filter = `blur(${a.blurLevel.toFixed(2)}px)`;
+          if (a.blurLevel >= MAX_BLUR * 0.98) {
+            a.revealed = false; a.blurLevel = 0;
+            a.el.style.opacity = '0'; a.el.style.filter = 'none';
+          }
+        } else {
+          a.el.style.opacity = '0';
+          a.el.style.filter  = 'none';
         }
       }
     }
-    if (!inside && a.isInside) {
-      a.isInside=false;
-      a.visitDwells.push(a.dwellTime);
-      a.totalDwellTime+=a.dwellTime;
-      a.lastVisitTs=ts; a.dwellTime=0; a.stableFor=0;
-      if (!a.visible) {
-        const exitState=classify(a,ts,scanSpeed,microMovement);
-        if (exitState!=='UNCLASSIFIED') revealAOI(a,exitState,ts);
-      }
-    }
-  }
-}
 
-/* ══════════════════════════════════════════════════════════════════════
-   ANALYSIS — FIXATION / SACCADE / HEATMAP / FIRST FIXATION
-   (run unconditionally, exactly like the original)
-   ══════════════════════════════════════════════════════════════════════ */
-
-function updateFixations(ts) {
-  const gh = window._gazeHistory;
-  if (gh.length < 2) return;
-  const win = gh.filter(p => p.ts > ts - 600);
-  if (win.length < 2) return;
-  const xs = win.map(p => p.x), ys = win.map(p => p.y);
-  const dispersion = (Math.max(...xs)-Math.min(...xs)) + (Math.max(...ys)-Math.min(...ys));
-  if (dispersion < FIX_DISPERSION) {
-    const cx = xs.reduce((a,b)=>a+b,0)/xs.length;
-    const cy = ys.reduce((a,b)=>a+b,0)/ys.length;
-    if (!currentFixation) {
-      currentFixation = { startTs:ts, cx, cy };
-    } else {
-      currentFixation.cx=cx; currentFixation.cy=cy;
-      currentFixation.duration=ts-currentFixation.startTs;
+    function mainLoop(ts) {
+      applyGaze(ts);
+      if (ts - lastAnaTs > ANA_INTERVAL) { analyze(); lastAnaTs = ts; }
+      requestAnimationFrame(mainLoop);
     }
-  } else {
-    if (currentFixation) {
-      const duration = ts - currentFixation.startTs;
-      if (duration >= FIX_MIN_DURATION) {
-        const fixEntry = { x:currentFixation.cx, y:currentFixation.cy, startTs:currentFixation.startTs, endTs:ts, duration };
-        fixationHistory.push(fixEntry);
-        if (fixationHistory.length > 50) fixationHistory.shift();
-        if (activeMode === 'SCANPATH') {
-          scanPathHistory.push(fixEntry);
-          if (scanPathHistory.length > 14) scanPathHistory.shift();
+
+    /* ── מבט מדומה: בוחר יעד אקראי חדש כל כמה שניות ונודד אליו לאט ── */
+    let simGX = 0.5, simGY = 0.5;
+    function pickNewSimTarget() {
+      simGX = 0.12 + Math.random() * 0.76;
+      simGY = 0.12 + Math.random() * 0.76;
+      const dwell = SIM_MIN_DWELL + Math.random() * (SIM_MAX_DWELL - SIM_MIN_DWELL);
+      setTimeout(pickNewSimTarget, dwell);
+    }
+    pickNewSimTarget();
+    gazeDot.style.display = 'block'; // תמיד גלוי - אין "עכבר שיצא מהמסך"
+
+    new p5(function(p) {
+      let vid;
+
+      p.preload = function() {
+        vid = p.createVideo('statue.mp4');
+      };
+
+      p.setup = function() {
+        const cnv = p.createCanvas(window.innerWidth, window.innerHeight);
+        cnv.class('p5-video-canvas');
+        cnv.parent('sceneC');
+
+        vid.hide();
+        vid.volume(0);
+        vid.loop();
+
+        vid.elt.onloadeddata = () => {
+          videoEl = vid.elt;
+          videoW  = vid.width;
+          videoH  = vid.height;
+        };
+
+        buildPool();
+        sizeOverlays();
+        window.addEventListener('resize', () => {
+          p.resizeCanvas(window.innerWidth, window.innerHeight);
+          sizeOverlays();
+        });
+
+        requestAnimationFrame(mainLoop);
+      };
+
+      p.draw = function() {
+        p.background(255);
+
+        if (!videoEl || videoW === 0) return;
+
+        // מצמצמים את התיבה שהווידאו מתאים אליה אנכית, כדי שתמיד
+        // יישאר רקע לבן גלוי גם למעלה וגם למטה - לא רק כשהיחסים לא תואמים.
+        const VERTICAL_MARGIN_FRAC = 0.12; // 12% שוליים מכל צד = 24% בסה"כ
+        const boxH = p.height * (1 - VERTICAL_MARGIN_FRAC * 2);
+        const boxY = p.height * VERTICAL_MARGIN_FRAC;
+
+        // CONTAIN scale בתוך התיבה המצומצמת
+        const cR = p.width / boxH;
+        const vR = videoW  / videoH;
+        let dW, dH, oX, oY;
+
+        if (vR > cR) {
+          dW = p.width; dH = dW / vR;
+          oX = 0; oY = boxY + (boxH - dH) / 2;
+        } else {
+          dH = boxH; dW = vR * dH;
+          oX = (p.width - dW) / 2; oY = boxY;
         }
+
+        p.image(vid, oX, oY, dW, dH);
+
+        renderOffX = oX; renderOffY = oY;
+        renderW    = dW; renderH    = dH;
+      };
+    });
+  })();
+
+  // ═══════════════════════════════════════════════════════════════
+  // SCENE D — six simultaneous analysis panels (statue.mp4)
+  // ═══════════════════════════════════════════════════════════════
+  (function () {
+    'use strict';
+
+    const MODES = ['GAZE','FIXATION','SACCADE','SCANPATH','HEATMAP','FIRSTFIX'];
+
+    const W_ANA=160, H_ANA=90, N_DOTS=250, DOT_STEP=2, DOT_THRESH=10, ANA_INTERVAL=600;
+    const W_AOI=320, H_AOI=180, AOI_INTERVAL=900, MAX_AOI=16, CLUSTER_DIST=0.07;
+    const AOI_MIN_W=0.04, AOI_MIN_H=0.03, AOI_MAX_SIZE=0.40;
+    const FIX_DISPERSION=0.04, FIX_MIN_DURATION=150;
+    const SAC_VELOCITY=0.8, SAC_MIN_AMP=0.03;
+    const W_HEAT=200, H_HEAT=112, HEAT_SIGMA=0.07, HEAT_WEIGHT=0.18, HEAT_DECAY=0.9975;
+    const GAZE_LERP=0.08;
+    const SIM_MIN_DWELL=1400, SIM_MAX_DWELL=3200, SIM_DRIFT_LERP=0.02;
+
+    const srcVideo = document.getElementById('sceneD-srcVideo');
+    const anaCtx = document.getElementById('sceneD-anaC').getContext('2d',{willReadFrequently:true});
+    const preCtx = document.getElementById('sceneD-preC').getContext('2d',{willReadFrequently:true});
+    const aoiCtx = document.getElementById('sceneD-aoiC').getContext('2d',{willReadFrequently:true});
+
+    let videoW=1, videoH=1;
+    let dotPts = [];
+    let aoiRegions = [];
+    let lastAnaTs=-9999, lastAoiTs=-9999;
+
+    let fixationHistory=[], currentFixation=null;
+    let scanPathHistory=[];
+    let saccadeHistory=[], saccadeActive=false, saccadeStart=null;
+    let heatmap=new Float32Array(W_HEAT*H_HEAT);
+    let firstFix=null, firstFixDone=false;
+
+    let rawGX=0.5, rawGY=0.5, sGX=0.5, sGY=0.5;
+    let simGX=0.5, simGY=0.5;
+    let gazeHistory=[];
+    let running = false;
+
+    const grid = document.getElementById('sceneD-grid');
+    const panels = [];
+
+    MODES.forEach(id => {
+      const panel = document.createElement('div');
+      panel.className = 'sceneD-panel';
+      panel.innerHTML = `<div class="sceneD-panel-canvas-wrap"><canvas></canvas></div>`;
+      grid.appendChild(panel);
+      panels.push({ id, canvas: panel.querySelector('canvas'), ctx: null, W:0, H:0 });
+    });
+
+    function sizePanels() {
+      const dpr = window.devicePixelRatio || 1;
+      for (const pnl of panels) {
+        const w = pnl.canvas.parentElement.offsetWidth || 300;
+        const h = pnl.canvas.parentElement.offsetHeight || 225;
+        pnl.canvas.width = w*dpr; pnl.canvas.height = h*dpr;
+        pnl.ctx = pnl.canvas.getContext('2d');
+        pnl.ctx.setTransform(dpr,0,0,dpr,0,0);
+        pnl.W = w; pnl.H = h;
       }
-      currentFixation = null;
     }
-  }
-}
+    window.addEventListener('resize', sizePanels);
 
-function updateSaccades(ts) {
-  const gh = window._gazeHistory;
-  if (gh.length < 2) return;
-  const last=gh[gh.length-1], prev=gh[gh.length-2];
-  const dt=(last.ts-prev.ts)/1000;
-  if (dt<=0) return;
-  const velocity=Math.hypot(last.x-prev.x,last.y-prev.y)/dt;
-  if (velocity >= SAC_VELOCITY) {
-    if (!saccadeActive) { saccadeActive=true; saccadeStart={x:prev.x,y:prev.y,ts:prev.ts}; }
-  } else {
-    if (saccadeActive && saccadeStart) {
-      const amp=Math.hypot(last.x-saccadeStart.x,last.y-saccadeStart.y);
-      if (amp>=SAC_MIN_AMP) {
-        saccadeHistory.push({ fromX:saccadeStart.x,fromY:saccadeStart.y, toX:last.x,toY:last.y, startTs:saccadeStart.ts,endTs:ts,duration:ts-saccadeStart.ts });
-        if (saccadeHistory.length>20) saccadeHistory.shift();
+    function sobelMag(px,w,h){
+      const g=new Float32Array(w*h), mg=new Float32Array(w*h);
+      for(let i=0;i<w*h;i++){const o=i*4; g[i]=0.299*px[o]+0.587*px[o+1]+0.114*px[o+2];}
+      for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+        const i=y*w+x;
+        const tl=g[i-w-1],tc=g[i-w],tr=g[i-w+1],ml=g[i-1],mr=g[i+1],bl=g[i+w-1],bc=g[i+w],br=g[i+w+1];
+        mg[i]=Math.hypot((tr+2*mr+br)-(tl+2*ml+bl),(bl+2*bc+br)-(tl+2*tc+tr));
       }
-      saccadeActive=false; saccadeStart=null;
+      return mg;
     }
-  }
-}
 
-function updateHeatmap() {
-  for (let i=0; i<heatmap.length; i++) heatmap[i]*=HEAT_DECAY;
-  const gx=sGX*W_HEAT, gy=sGY*H_HEAT;
-  const sigma=HEAT_SIGMA*Math.max(W_HEAT,H_HEAT);
-  const r=Math.ceil(3*sigma);
-  const x0=Math.max(0,Math.floor(gx-r)), x1=Math.min(W_HEAT-1,Math.ceil(gx+r));
-  const y0=Math.max(0,Math.floor(gy-r)), y1=Math.min(H_HEAT-1,Math.ceil(gy+r));
-  const inv2s2=1/(2*sigma*sigma);
-  for (let y=y0;y<=y1;y++) {
-    for (let x=x0;x<=x1;x++) {
-      const d2=(x-gx)**2+(y-gy)**2;
-      heatmap[y*W_HEAT+x]+=HEAT_WEIGHT*Math.exp(-d2*inv2s2);
+    function analyzeDots(){
+      if (srcVideo.readyState<2) return;
+      anaCtx.drawImage(srcVideo,0,0,W_ANA,H_ANA);
+      const id=anaCtx.getImageData(0,0,W_ANA,H_ANA);
+      const mg=sobelMag(id.data,W_ANA,H_ANA);
+      const all=[];
+      for(let y=1;y<H_ANA-1;y+=DOT_STEP)for(let x=1;x<W_ANA-1;x+=DOT_STEP){
+        const i=y*W_ANA+x; if(mg[i]>=DOT_THRESH) all.push({i,mag:mg[i]});
+      }
+      all.sort((a,b)=>b.mag-a.mag); if(all.length>N_DOTS) all.length=N_DOTS;
+      dotPts = all.map(({i})=>({ nx:(i%W_ANA)/W_ANA, ny:Math.floor(i/W_ANA)/H_ANA }));
+      preCtx.drawImage(srcVideo,0,0,W_ANA,H_ANA);
     }
-  }
-}
 
-function updateFirstFix() {
-  if (activeMode !== 'FIRSTFIX') return;
-  if (firstFixDone) return;
-  const recent = fixationHistory.filter(f => f.startTs >= firstFixModeTs);
-  if (recent.length > 0) {
-    firstFix = recent[0];
-    firstFixDone = true;
-  }
-}
+    function detectAOI(px,w,h){
+      const mg=sobelMag(px,w,h), THRESH=20, STEP=3, pts=[];
+      for(let y=2;y<h-2;y+=STEP)for(let x=2;x<w-2;x+=STEP){
+        if(mg[y*w+x]>=THRESH) pts.push({nx:x/w,ny:y/h,mag:mg[y*w+x]});
+      }
+      if(!pts.length) return [];
+      pts.sort((a,b)=>b.mag-a.mag);
+      const used=new Uint8Array(pts.length), regions=[];
+      for(let i=0;i<pts.length && regions.length<MAX_AOI*4;i++){
+        if(used[i]) continue;
+        const seed=pts[i];
+        let x0=seed.nx,x1=seed.nx,y0=seed.ny,y1=seed.ny,count=1; used[i]=1;
+        for(let j=i+1;j<pts.length;j++){
+          if(used[j]) continue;
+          if(Math.hypot(pts[j].nx-seed.nx,pts[j].ny-seed.ny)<CLUSTER_DIST){
+            x0=Math.min(x0,pts[j].nx);x1=Math.max(x1,pts[j].nx);
+            y0=Math.min(y0,pts[j].ny);y1=Math.max(y1,pts[j].ny);
+            count++; used[j]=1;
+          }
+        }
+        if(count<4) continue;
+        const pad=0.022, rx=Math.max(0,x0-pad), ry=Math.max(0,y0-pad);
+        const rw=Math.min(1,x1+pad)-rx, rh=Math.min(1,y1+pad)-ry;
+        if(rw<AOI_MIN_W||rh<AOI_MIN_H||rw>AOI_MAX_SIZE||rh>AOI_MAX_SIZE) continue;
+        regions.push({x:rx,y:ry,w:rw,h:rh,cx:rx+rw/2,cy:ry+rh/2});
+      }
+      const kept=[];
+      for(const r of regions){
+        let dup=false;
+        for(const k of kept) if(Math.hypot(r.cx-k.cx,r.cy-k.cy)<CLUSTER_DIST*1.4){dup=true;break;}
+        if(!dup) kept.push(r);
+        if(kept.length>=MAX_AOI) break;
+      }
+      return kept;
+    }
 
-/* ══════════════════════════════════════════════════════════════════════
-   DRAW — one function per mode (identical drawing logic to the original)
-   ══════════════════════════════════════════════════════════════════════ */
+    function analyzeAOI(){
+      if (srcVideo.readyState<2) return;
+      aoiCtx.drawImage(srcVideo,0,0,W_AOI,H_AOI);
+      const id=aoiCtx.getImageData(0,0,W_AOI,H_AOI);
+      aoiRegions = detectAOI(id.data,W_AOI,H_AOI);
+    }
 
-function drawGazeMode() {
-  const W=dotCanvas.width, H=dotCanvas.height;
-  if (window._dotPts) {
-    dotCtx.fillStyle='rgba(224,26,0,0.82)';
-    dotCtx.beginPath();
-    for (const p of window._dotPts) dotCtx.rect(p.nx*W-1,p.ny*H-1,2,2);
-    dotCtx.fill();
-  }
-  for (const a of aoiPool) {
-    if (!a.active||!a.visible) continue;
-    const sx=a.x*W,sy=a.y*H,sw=a.w*W,sh=a.h*H;
-    dotCtx.strokeStyle='rgba(224,26,0,0.7)'; dotCtx.lineWidth=1;
-    dotCtx.strokeRect(sx,sy,sw,sh);
-    const c=Math.min(sw,sh)*0.25;
-    dotCtx.strokeStyle='rgba(224,26,0,0.9)'; dotCtx.lineWidth=1.5;
-    [[sx,sy,c,0,0,c],[sx+sw,sy,-c,0,0,c],[sx,sy+sh,c,0,0,-c],[sx+sw,sy+sh,-c,0,0,-c]]
-      .forEach(([x,y,dx1,dy1,dx2,dy2])=>{
-        dotCtx.beginPath(); dotCtx.moveTo(x+dx1,y+dy1); dotCtx.lineTo(x,y); dotCtx.lineTo(x+dx2,y+dy2); dotCtx.stroke();
+    function updateFixations(ts){
+      if (gazeHistory.length<2) return;
+      const win=gazeHistory.filter(p=>p.ts>ts-600);
+      if (win.length<2) return;
+      const xs=win.map(p=>p.x), ys=win.map(p=>p.y);
+      const dispersion=(Math.max(...xs)-Math.min(...xs))+(Math.max(...ys)-Math.min(...ys));
+      if (dispersion<FIX_DISPERSION){
+        const cx=xs.reduce((a,b)=>a+b,0)/xs.length, cy=ys.reduce((a,b)=>a+b,0)/ys.length;
+        if(!currentFixation) currentFixation={startTs:ts,cx,cy};
+        else { currentFixation.cx=cx; currentFixation.cy=cy; currentFixation.duration=ts-currentFixation.startTs; }
+      } else if (currentFixation) {
+        const duration=ts-currentFixation.startTs;
+        if (duration>=FIX_MIN_DURATION){
+          const fixEntry={x:currentFixation.cx,y:currentFixation.cy,startTs:currentFixation.startTs,endTs:ts,duration};
+          fixationHistory.push(fixEntry); if(fixationHistory.length>50) fixationHistory.shift();
+          scanPathHistory.push(fixEntry); if(scanPathHistory.length>14) scanPathHistory.shift();
+          if (!firstFixDone){ firstFix=fixEntry; firstFixDone=true; }
+        }
+        currentFixation=null;
+      }
+    }
+
+    function updateSaccades(ts){
+      if (gazeHistory.length<2) return;
+      const last=gazeHistory[gazeHistory.length-1], prev=gazeHistory[gazeHistory.length-2];
+      const dt=(last.ts-prev.ts)/1000; if(dt<=0) return;
+      const velocity=Math.hypot(last.x-prev.x,last.y-prev.y)/dt;
+      if (velocity>=SAC_VELOCITY){
+        if(!saccadeActive){ saccadeActive=true; saccadeStart={x:prev.x,y:prev.y,ts:prev.ts}; }
+      } else if (saccadeActive && saccadeStart){
+        const amp=Math.hypot(last.x-saccadeStart.x,last.y-saccadeStart.y);
+        if(amp>=SAC_MIN_AMP){
+          saccadeHistory.push({fromX:saccadeStart.x,fromY:saccadeStart.y,toX:last.x,toY:last.y,endTs:ts});
+          if(saccadeHistory.length>20) saccadeHistory.shift();
+        }
+        saccadeActive=false; saccadeStart=null;
+      }
+    }
+
+    function updateHeatmap(){
+      for(let i=0;i<heatmap.length;i++) heatmap[i]*=HEAT_DECAY;
+      const gx=sGX*W_HEAT, gy=sGY*H_HEAT, sigma=HEAT_SIGMA*Math.max(W_HEAT,H_HEAT), r=Math.ceil(3*sigma);
+      const x0=Math.max(0,Math.floor(gx-r)), x1=Math.min(W_HEAT-1,Math.ceil(gx+r));
+      const y0=Math.max(0,Math.floor(gy-r)), y1=Math.min(H_HEAT-1,Math.ceil(gy+r));
+      const inv2s2=1/(2*sigma*sigma);
+      for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+        const d2=(x-gx)**2+(y-gy)**2;
+        heatmap[y*W_HEAT+x]+=HEAT_WEIGHT*Math.exp(-d2*inv2s2);
+      }
+    }
+
+    function pickNewSimTarget(){
+      simGX=0.12+Math.random()*0.76; simGY=0.12+Math.random()*0.76;
+      const dwell=SIM_MIN_DWELL+Math.random()*(SIM_MAX_DWELL-SIM_MIN_DWELL);
+      setTimeout(pickNewSimTarget, dwell);
+    }
+
+    function applyGaze(ts){
+      rawGX += (simGX-rawGX)*SIM_DRIFT_LERP;
+      rawGY += (simGY-rawGY)*SIM_DRIFT_LERP;
+      sGX += (rawGX-sGX)*GAZE_LERP;
+      sGY += (rawGY-sGY)*GAZE_LERP;
+      gazeHistory.push({x:sGX,y:sGY,ts}); if(gazeHistory.length>90) gazeHistory.shift();
+    }
+
+    function getVideoFit(cw, ch){
+      const cR=cw/ch, vR=videoW/videoH;
+      let dW,dH,oX,oY;
+      if (vR>cR){ dW=cw; dH=dW/vR; oX=0; oY=(ch-dH)/2; }
+      else      { dH=ch; dW=vR*dH; oX=(cw-dW)/2; oY=0; }
+      return {dW,dH,oX,oY};
+    }
+
+    function drawVideoFrame(ctx, cw, ch){
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,cw,ch);
+      if (videoW<=1) return {dW:0,dH:0,oX:0,oY:0};
+      const fit = getVideoFit(cw,ch);
+      ctx.drawImage(srcVideo, fit.oX, fit.oY, fit.dW, fit.dH);
+      return fit;
+    }
+
+    function drawGazePanel(ctx, cw, ch){
+      const fit = drawVideoFrame(ctx, cw, ch);
+      ctx.fillStyle = 'rgba(224,26,0,0.82)';
+      for (const p of dotPts) {
+        const sx = fit.oX + p.nx*fit.dW, sy = fit.oY + p.ny*fit.dH;
+        ctx.fillRect(sx-1, sy-1, 2, 2);
+      }
+      for (const r of aoiRegions) {
+        const sx=fit.oX+r.x*fit.dW, sy=fit.oY+r.y*fit.dH, sw=r.w*fit.dW, sh=r.h*fit.dH;
+        ctx.strokeStyle='rgba(224,26,0,0.75)'; ctx.lineWidth=1;
+        ctx.strokeRect(sx,sy,sw,sh);
+      }
+    }
+
+    function drawFixationPanel(ctx, cw, ch, ts){
+      const fit = drawVideoFrame(ctx, cw, ch);
+      for (const fix of fixationHistory.slice(-10)) {
+        const age=ts-fix.endTs, opacity=Math.max(0,1-age/4000);
+        if (opacity<=0) continue;
+        const cx=fit.oX+fix.x*fit.dW, cy=fit.oY+fix.y*fit.dH;
+        const r=Math.min(6+fix.duration/90,26);
+        ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+        ctx.fillStyle=`rgba(224,26,0,${opacity*0.18})`; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+        ctx.strokeStyle=`rgba(224,26,0,${opacity})`; ctx.lineWidth=1.5; ctx.stroke();
+      }
+      if (currentFixation) {
+        const pulse=2+Math.sin(ts/160)*2;
+        const cx=fit.oX+currentFixation.cx*fit.dW, cy=fit.oY+currentFixation.cy*fit.dH;
+        ctx.beginPath(); ctx.arc(cx,cy,pulse,0,Math.PI*2);
+        ctx.fillStyle='rgba(224,26,0,1)'; ctx.fill();
+      }
+    }
+
+    function drawSaccadePanel(ctx, cw, ch, ts){
+      const fit = drawVideoFrame(ctx, cw, ch);
+      for (const sac of saccadeHistory.slice(-8)) {
+        const age=ts-sac.endTs, opacity=Math.max(0,1-age/2500);
+        if (opacity<=0) continue;
+        const fx=fit.oX+sac.fromX*fit.dW, fy=fit.oY+sac.fromY*fit.dH;
+        const tx=fit.oX+sac.toX*fit.dW,   ty=fit.oY+sac.toY*fit.dH;
+        ctx.beginPath(); ctx.moveTo(fx,fy); ctx.lineTo(tx,ty);
+        ctx.strokeStyle=`rgba(224,26,0,${opacity})`; ctx.lineWidth=1.5; ctx.stroke();
+        const angle=Math.atan2(ty-fy,tx-fx), aLen=8;
+        ctx.beginPath(); ctx.moveTo(tx,ty);
+        ctx.lineTo(tx-aLen*Math.cos(angle-Math.PI/6),ty-aLen*Math.sin(angle-Math.PI/6));
+        ctx.lineTo(tx-aLen*Math.cos(angle+Math.PI/6),ty-aLen*Math.sin(angle+Math.PI/6));
+        ctx.closePath(); ctx.fillStyle=`rgba(224,26,0,${opacity})`; ctx.fill();
+      }
+    }
+
+    function drawScanPathPanel(ctx, cw, ch){
+      const fit = drawVideoFrame(ctx, cw, ch);
+      const recent = scanPathHistory.slice(-14);
+      if (recent.length<1) return;
+      if (recent.length>=2) {
+        ctx.save(); ctx.setLineDash([3,5]);
+        ctx.strokeStyle='rgba(224,26,0,0.6)'; ctx.lineWidth=1.2;
+        ctx.beginPath();
+        recent.forEach((f,i)=>{
+          const x=fit.oX+f.x*fit.dW, y=fit.oY+f.y*fit.dH;
+          i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+        });
+        ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+      }
+      recent.forEach((f,i)=>{
+        const cx=fit.oX+f.x*fit.dW, cy=fit.oY+f.y*fit.dH;
+        ctx.beginPath(); ctx.arc(cx,cy,8,0,Math.PI*2);
+        ctx.strokeStyle='rgba(224,26,0,1)'; ctx.lineWidth=1.5; ctx.stroke();
       });
-  }
-}
-
-function drawFixations(ts) {
-  const W=dotCanvas.width, H=dotCanvas.height;
-  for (const fix of fixationHistory.slice(-10)) {
-    const age=ts-fix.endTs;
-    const opacity=Math.max(0,1-age/4000);
-    if (opacity<=0) continue;
-    const cx=fix.x*W, cy=fix.y*H;
-    const r=Math.min(8+fix.duration/80,44);
-    dotCtx.beginPath(); dotCtx.arc(cx,cy,r,0,Math.PI*2);
-    dotCtx.fillStyle=`rgba(224,26,0,${opacity*0.18})`; dotCtx.fill();
-    dotCtx.beginPath(); dotCtx.arc(cx,cy,r,0,Math.PI*2);
-    dotCtx.strokeStyle=`rgba(224,26,0,${opacity})`; dotCtx.lineWidth=2; dotCtx.stroke();
-    if (fix.duration>300) {
-      dotCtx.fillStyle=`rgba(224,26,0,${opacity})`;
-      dotCtx.font='bold 9px Heebo'; dotCtx.textAlign='center'; dotCtx.textBaseline='alphabetic';
-      dotCtx.fillText(`${Math.round(fix.duration)}ms`,cx,cy+r+13);
     }
-  }
-  if (currentFixation) {
-    const pulse=3+Math.sin(ts/160)*3;
-    const cx=currentFixation.cx*W, cy=currentFixation.cy*H;
-    dotCtx.beginPath(); dotCtx.arc(cx,cy,pulse,0,Math.PI*2);
-    dotCtx.fillStyle='rgba(224,26,0,1)'; dotCtx.fill();
-  }
-}
 
-function drawSaccades(ts) {
-  const W=dotCanvas.width, H=dotCanvas.height;
-  for (const sac of saccadeHistory.slice(-8)) {
-    const age=ts-sac.endTs;
-    const opacity=Math.max(0,1-age/2500);
-    if (opacity<=0) continue;
-    const fx=sac.fromX*W, fy=sac.fromY*H, tx=sac.toX*W, ty=sac.toY*H;
-    dotCtx.beginPath(); dotCtx.moveTo(fx,fy); dotCtx.lineTo(tx,ty);
-    dotCtx.strokeStyle=`rgba(224,26,0,${opacity})`; dotCtx.lineWidth=2; dotCtx.stroke();
-    const angle=Math.atan2(ty-fy,tx-fx), aLen=10;
-    dotCtx.beginPath();
-    dotCtx.moveTo(tx,ty);
-    dotCtx.lineTo(tx-aLen*Math.cos(angle-Math.PI/6),ty-aLen*Math.sin(angle-Math.PI/6));
-    dotCtx.lineTo(tx-aLen*Math.cos(angle+Math.PI/6),ty-aLen*Math.sin(angle+Math.PI/6));
-    dotCtx.closePath();
-    dotCtx.fillStyle=`rgba(224,26,0,${opacity})`; dotCtx.fill();
-  }
-  if (saccadeActive && saccadeStart) {
-    dotCtx.save(); dotCtx.setLineDash([4,4]);
-    dotCtx.beginPath(); dotCtx.moveTo(saccadeStart.x*W,saccadeStart.y*H); dotCtx.lineTo(sGX*W,sGY*H);
-    dotCtx.strokeStyle='rgba(224,26,0,0.6)'; dotCtx.lineWidth=1.5; dotCtx.stroke();
-    dotCtx.setLineDash([]); dotCtx.restore();
-  }
-}
-
-function drawScanPath(ts) {
-  const recent=scanPathHistory.slice(-14);
-  if (recent.length<1) return;
-  const W=dotCanvas.width, H=dotCanvas.height, total=recent.length;
-  if (recent.length>=2) {
-    dotCtx.save(); dotCtx.setLineDash([4,6]);
-    dotCtx.strokeStyle='rgba(224,26,0,0.6)'; dotCtx.lineWidth=1.5;
-    dotCtx.beginPath();
-    for (let i=0;i<recent.length;i++) {
-      const {x,y}=recent[i];
-      i===0 ? dotCtx.moveTo(x*W,y*H) : dotCtx.lineTo(x*W,y*H);
+    let heatCanvas, heatCtx;
+    function drawHeatmapPanel(ctx, cw, ch){
+      const fit = drawVideoFrame(ctx, cw, ch);
+      let maxVal=0; for(let i=0;i<heatmap.length;i++) if(heatmap[i]>maxVal) maxVal=heatmap[i];
+      if (maxVal<0.01) return;
+      const img=heatCtx.createImageData(W_HEAT,H_HEAT), d=img.data;
+      for(let i=0;i<W_HEAT*H_HEAT;i++){
+        const val=heatmap[i]/maxVal; if(val<0.15) continue;
+        let r,g,b;
+        if      (val<0.25){const t=(val-0.15)/0.10; r=0;g=Math.round(t*255);b=255;}
+        else if (val<0.50){const t=(val-0.25)/0.25; r=0;g=255;b=Math.round((1-t)*255);}
+        else if (val<0.75){const t=(val-0.50)/0.25; r=Math.round(t*255);g=255;b=0;}
+        else              {const t=(val-0.75)/0.25; r=255;g=Math.round((1-t)*255);b=0;}
+        d[i*4]=r; d[i*4+1]=g; d[i*4+2]=b; d[i*4+3]=Math.min(255,val*200);
+      }
+      heatCtx.putImageData(img,0,0);
+      ctx.globalAlpha=0.7;
+      ctx.drawImage(heatCanvas, fit.oX, fit.oY, fit.dW, fit.dH);
+      ctx.globalAlpha=1;
     }
-    dotCtx.stroke(); dotCtx.setLineDash([]); dotCtx.restore();
-  }
-  for (let i=0;i<total;i++) {
-    const {x,y}=recent[i];
-    const cx=x*W, cy=y*H;
-    const isNewest=i===total-1;
-    const r=isNewest ? 12+Math.sin(ts/300)*2 : 11;
-    dotCtx.beginPath(); dotCtx.arc(cx,cy,r,0,Math.PI*2);
-    dotCtx.strokeStyle='rgba(224,26,0,1)'; dotCtx.lineWidth=2; dotCtx.stroke();
-    dotCtx.fillStyle='rgba(224,26,0,1)';
-    dotCtx.font='bold 9px Heebo'; dotCtx.textAlign='center'; dotCtx.textBaseline='middle';
-    dotCtx.fillText(i+1,cx,cy);
-    dotCtx.textBaseline='alphabetic';
-  }
-}
 
-function drawHeatmap() {
-  let maxVal=0;
-  for (let i=0;i<heatmap.length;i++) { if (heatmap[i]>maxVal) maxVal=heatmap[i]; }
-  if (maxVal<0.01) return;
-  heatCtx.clearRect(0,0,W_HEAT,H_HEAT);
-  const img=heatCtx.createImageData(W_HEAT,H_HEAT);
-  const d=img.data;
-  for (let i=0;i<W_HEAT*H_HEAT;i++) {
-    const val=heatmap[i]/maxVal;
-    if (val<0.15) continue;
-    let r,g,b;
-    if      (val<0.25) { const t=(val-0.15)/0.10; r=0; g=Math.round(t*255); b=255; }
-    else if (val<0.50) { const t=(val-0.25)/0.25; r=0; g=255; b=Math.round((1-t)*255); }
-    else if (val<0.75) { const t=(val-0.50)/0.25; r=Math.round(t*255); g=255; b=0; }
-    else               { const t=(val-0.75)/0.25; r=255; g=Math.round((1-t)*255); b=0; }
-    d[i*4]=r; d[i*4+1]=g; d[i*4+2]=b; d[i*4+3]=Math.min(255,val*220);
-  }
-  heatCtx.putImageData(img,0,0);
-  const W=dotCanvas.width, H=dotCanvas.height;
-  dotCtx.globalAlpha=0.72;
-  dotCtx.drawImage(heatCanvas,0,0,W,H);
-  dotCtx.globalAlpha=1;
-}
+    function drawFirstFixPanel(ctx, cw, ch, ts){
+      const fit = drawVideoFrame(ctx, cw, ch);
+      if (!firstFix) return;
+      const cx=fit.oX+firstFix.x*fit.dW, cy=fit.oY+firstFix.y*fit.dH;
+      const pulse=12+Math.sin(ts/400)*4;
+      ctx.beginPath(); ctx.arc(cx,cy,pulse,0,Math.PI*2);
+      ctx.strokeStyle='rgba(224,26,0,0.35)'; ctx.lineWidth=1.2; ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx,cy,9,0,Math.PI*2);
+      ctx.fillStyle='rgba(224,26,0,1)'; ctx.fill();
+    }
 
-function drawFirstFix(ts) {
-  const W=dotCanvas.width, H=dotCanvas.height;
-  if (!firstFix) {
-    dotCtx.fillStyle='rgba(150,150,150,0.7)';
-    dotCtx.font='300 11px Heebo'; dotCtx.textAlign='center'; dotCtx.textBaseline='middle';
-    dotCtx.fillText('WAITING FOR FIRST FIXATION',W/2,H/2);
-    dotCtx.textBaseline='alphabetic';
-    return;
-  }
-  const cx=firstFix.x*W, cy=firstFix.y*H;
-  const pulse=20+Math.sin(ts/400)*5;
-  dotCtx.beginPath(); dotCtx.arc(cx,cy,pulse,0,Math.PI*2);
-  dotCtx.strokeStyle='rgba(224,26,0,0.35)'; dotCtx.lineWidth=1.5; dotCtx.stroke();
-  dotCtx.beginPath(); dotCtx.arc(cx,cy,14,0,Math.PI*2);
-  dotCtx.fillStyle='rgba(224,26,0,1)'; dotCtx.fill();
-  dotCtx.strokeStyle='rgba(224,26,0,1)'; dotCtx.lineWidth=2; dotCtx.stroke();
-  const offset = (firstFix.startTs - firstFixModeTs) / 1000;
-  const textY = cy - 46;
-  dotCtx.textAlign='center'; dotCtx.textBaseline='alphabetic';
-  dotCtx.fillStyle='rgba(224,26,0,1)';
-  dotCtx.font='bold 11px Heebo';
-  dotCtx.fillText('FIRST FIXATION', cx, textY);
-  dotCtx.font='300 9px Heebo';
-  dotCtx.fillText(`+${offset.toFixed(2)}s`, cx, textY + 14);
-}
+    const DRAWERS = {
+      GAZE: drawGazePanel,
+      FIXATION: drawFixationPanel,
+      SACCADE: drawSaccadePanel,
+      SCANPATH: drawScanPathPanel,
+      HEATMAP: drawHeatmapPanel,
+      FIRSTFIX: drawFirstFixPanel,
+    };
 
-function drawFrame(ts) {
-  const W=dotCanvas.width, H=dotCanvas.height;
-  if (!W||!H) return;
-  dotCtx.clearRect(0,0,W,H);
+    function mainLoop(ts){
+      if (!running) return;
+      applyGaze(ts);
+      updateFixations(ts);
+      updateSaccades(ts);
+      updateHeatmap();
 
-  if (activeMode==='HEATMAP')   drawHeatmap();
-  if (activeMode==='SCANPATH')  drawScanPath(ts);
-  if (activeMode==='SACCADE')   drawSaccades(ts);
-  if (activeMode==='FIXATION')  drawFixations(ts);
-  if (activeMode==='FIRSTFIX')  drawFirstFix(ts);
-  if (activeMode==='GAZE')      drawGazeMode();
+      if (ts-lastAnaTs>ANA_INTERVAL){ analyzeDots(); lastAnaTs=ts; }
+      if (ts-lastAoiTs>AOI_INTERVAL){ analyzeAOI();  lastAoiTs=ts; }
 
-  annLayer.style.opacity = activeMode==='GAZE' ? '1' : '0';
-  gazeDot.style.display  = activeMode==='GAZE' ? '' : 'none';
-}
+      for (const pnl of panels) {
+        if (!pnl.ctx) continue;
+        DRAWERS[pnl.id](pnl.ctx, pnl.W, pnl.H, ts);
+      }
+      requestAnimationFrame(mainLoop);
+    }
 
-/* ══════════════════════════════════════════════════════════════════════
-   GAZE APPLICATION — driven by the SIMULATED target instead of a sensor
-   ══════════════════════════════════════════════════════════════════════ */
+    async function boot(){
+      sizePanels();
+      heatCanvas=document.createElement('canvas');
+      heatCanvas.width=W_HEAT; heatCanvas.height=H_HEAT;
+      heatCtx=heatCanvas.getContext('2d');
 
-function applyGaze(ts) {
-  const dt = lastGazeTs ? Math.min((ts-lastGazeTs)/1000,0.05) : 0;
-  lastGazeTs = ts;
+      srcVideo.addEventListener('loadedmetadata', () => { videoW=srcVideo.videoWidth; videoH=srcVideo.videoHeight; });
+      if (srcVideo.readyState<2) await new Promise(r=>srcVideo.addEventListener('canplay', r, {once:true}));
+      videoW=srcVideo.videoWidth; videoH=srcVideo.videoHeight;
 
-  // נדידה איטית לעבר יעד המבט המדומה, ואז אותו lerp שהיה קיים במקור
-  rawGX += (simGX - rawGX) * SIM_DRIFT_LERP;
-  rawGY += (simGY - rawGY) * SIM_DRIFT_LERP;
+      pickNewSimTarget();
+      running = true;
+      requestAnimationFrame(mainLoop);
+    }
 
-  sGX += (rawGX-sGX)*GAZE_LERP;
-  sGY += (rawGY-sGY)*GAZE_LERP;
+    boot();
 
-  // מזין את מד היציבות באותו אופן שבו שימש קודם באפר ההיסט של הראש
-  offXBuf.push(sGX); if (offXBuf.length>BUF_MAX) offXBuf.shift();
-  offYBuf.push(sGY); if (offYBuf.length>BUF_MAX) offYBuf.shift();
+    // חושף החוצה כדי שמנגנון החלפת הסצנות יוכל לעצור/להפעיל מחדש את הלולאה
+    window.__sceneD_setRunning = function (val) {
+      running = val;
+      if (running) requestAnimationFrame(mainLoop);
+    };
+  })();
 
-  const W=videoWrapper.offsetWidth, H=videoWrapper.offsetHeight;
-  if (!W||!H) return;
+  // ═══════════════════════════════════════════════════════════════
+  // SCENE SWITCHING — לחיצה על רווח עוברת לאנימציה הבאה
+  // ═══════════════════════════════════════════════════════════════
+  (function () {
+    var scenes = [
+      document.getElementById('sceneA'),
+      document.getElementById('sceneB'),
+      document.getElementById('sceneC'),
+      document.getElementById('sceneD')
+    ];
+    var current = 0;
 
-  const gpx=sGX*W, gpy=sGY*H;
-  const rect=videoWrapper.getBoundingClientRect();
-  gazeDot.style.left=(rect.left+gpx)+'px';
-  gazeDot.style.top =(rect.top +gpy)+'px';
-
-  window._gazeHistory.push({x:sGX,y:sGY,ts});
-  if (window._gazeHistory.length>90) window._gazeHistory.shift();
-
-  if (activeMode==='GAZE') {
-    const scanSpeed=aoiPool.filter(a=>a.lastVisitTs>ts-2000).length;
-    const _gh=window._gazeHistory.slice(-8);
-    const _mx=_gh.reduce((s,p)=>s+p.x,0)/_gh.length;
-    const _my=_gh.reduce((s,p)=>s+p.y,0)/_gh.length;
-    const microMovement=_gh.reduce((s,p)=>s+Math.hypot(p.x-_mx,p.y-_my),0)/_gh.length;
-    applyDotGaze(ts,gpx,gpy,W,H,scanSpeed,microMovement);
-    applyAOIGaze(ts,scanSpeed,microMovement,dt);
-  }
-}
-
-/* ══════════════════════════════════════════════════════════════════════
-   SIMULATED GAZE DRIVER — picks a new random target every 1.4–3.2s
-   ══════════════════════════════════════════════════════════════════════ */
-
-function pickNewSimTarget() {
-  simGX = 0.12 + Math.random() * 0.76;
-  simGY = 0.12 + Math.random() * 0.76;
-  const dwell = SIM_MIN_DWELL + Math.random() * (SIM_MAX_DWELL - SIM_MIN_DWELL);
-  setTimeout(pickNewSimTarget, dwell);
-}
-
-/* ══════════════════════════════════════════════════════════════════════
-   AUTO MODE CYCLING — replaces the manual mode-selection UI
-   ══════════════════════════════════════════════════════════════════════ */
-
-function setActiveMode(id) {
-  activeMode = id;
-  const idx = MODE_ORDER.indexOf(id);
-  modeIndicatorName.textContent = MODE_LABELS[id] || id;
-  modeIndicatorIdx.textContent  = String(idx+1).padStart(2,'0') + ' / ' + String(MODE_ORDER.length).padStart(2,'0');
-
-  if (id === 'FIRSTFIX') {
-    firstFix = null; firstFixDone = false; firstFixModeTs = performance.now();
-  }
-  if (id === 'SCANPATH') {
-    scanPathHistory = [];
-  }
-  if (id !== 'GAZE') {
-    annLayer.style.opacity = '0';
-    gazeDot.style.display  = 'none';
-  }
-}
-
-function startModeCycling() {
-  let idx = 0;
-  setActiveMode(MODE_ORDER[idx]);
-  setInterval(() => {
-    idx = (idx + 1) % MODE_ORDER.length;
-    setActiveMode(MODE_ORDER[idx]);
-  }, MODE_DWELL_MS);
-}
-
-/* ══════════════════════════════════════════════════════════════════════
-   MAIN LOOP
-   ══════════════════════════════════════════════════════════════════════ */
-
-function mainLoop(ts) {
-  applyGaze(ts);
-
-  updateFixations(ts);
-  updateSaccades(ts);
-  updateHeatmap();
-  updateFirstFix();
-
-  if (activeMode==='GAZE') {
-    if (ts-lastAnaTs>ANA_INTERVAL) { analyzeDots(); lastAnaTs=ts; }
-    if (ts-lastAoiTs>AOI_INTERVAL) { analyzeAOI();  lastAoiTs=ts; }
-  }
-
-  drawFrame(ts);
-  requestAnimationFrame(mainLoop);
-}
-
-/* ══════════════════════════════════════════════════════════════════════
-   BOOT
-   ══════════════════════════════════════════════════════════════════════ */
-
-function sizeWrapper(){ dotCanvas.width=window.innerWidth; dotCanvas.height=window.innerHeight; }
-
-async function boot() {
-  buildDotPool();
-  sizeWrapper();
-  mainVideo.addEventListener('loadedmetadata', sizeWrapper);
-  window.addEventListener('resize', sizeWrapper);
-  if (mainVideo.readyState < 2) await new Promise(r => mainVideo.addEventListener('canplay', r, { once:true }));
-
-  heatCanvas = document.createElement('canvas');
-  heatCanvas.width = W_HEAT; heatCanvas.height = H_HEAT;
-  heatCtx = heatCanvas.getContext('2d');
-
-  mainVideo.play().catch(() => {});
-  sessionStartTs = Date.now();
-
-  analyzeDots(); analyzeAOI();
-  lastAnaTs = lastAoiTs = performance.now();
-
-  pickNewSimTarget();
-  startModeCycling();
-
-  requestAnimationFrame(mainLoop);
-}
-
-boot();
+    document.addEventListener('keydown', function (e) {
+      if (e.code !== 'Space') return;
+      e.preventDefault();
+      scenes[current].classList.remove('active');
+      if (scenes[current].id === 'sceneD' && window.__sceneD_setRunning) window.__sceneD_setRunning(false);
+      current = (current + 1) % scenes.length;
+      scenes[current].classList.add('active');
+      if (scenes[current].id === 'sceneD' && window.__sceneD_setRunning) window.__sceneD_setRunning(true);
+    });
+  })();
 </script>
+
 </body>
 </html>
