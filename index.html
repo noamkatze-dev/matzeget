@@ -302,6 +302,42 @@
     height: 100%;
     display: block;
   }
+  /* ── SCENE SESSION: תמונות מתפרצות מנקודות אדומות + קרדיטים ── */
+  #sessionViewer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  #sessionBg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+  }
+
+  #dotsCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .session-img {
+    position: absolute;
+    z-index: 3;
+    object-fit: cover;
+    pointer-events: none;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    transform: scale(0);
+  }
 </style>
 </head>
 <body>
@@ -365,6 +401,14 @@
     <div id="splashText">
       <img src="LOGO.svg" alt="logo">
     </div>
+  </div>
+</div>
+
+<!-- SCENE SESSION -->
+<div id="sceneSession" class="scene">
+  <div id="sessionViewer">
+    <img id="sessionBg" src="https://static.wixstatic.com/media/cd7757_819bc078308140e390113f9ad1230fb9~mv2.png" alt="background">
+    <canvas id="dotsCanvas"></canvas>
   </div>
 </div>
 
@@ -1641,6 +1685,193 @@
   })();
 
   // ═══════════════════════════════════════════════════════════════
+  // SCENE SESSION — תמונות מתפרצות מנקודות אדומות על המסך + קרדיטים
+  // ═══════════════════════════════════════════════════════════════
+  (function () {
+    'use strict';
+
+    // ── התמונות ומיקומי הנקודות ────────────────────────────────────
+    // הקרדיט של כל תמונה משויך לפי שם הקובץ (השדה name תאם במקור
+    // לשם הקובץ בלי הסיומת) - השם עצמו כבר קבע את הזיהוי, אז רק
+    // הוחלף ה-src מקישור Wix לשם הקובץ המקומי המתאים.
+    const IMAGES = [
+      { src: 'D1248-020.JPG', name: 'D1248-020', credit: 'עמוס בן גרשום · לע"מ' },
+      { src: 'D1241-029.JPG', name: 'D1241-029', credit: 'צלם לא צוין · לע"מ' },
+      { src: 'D1238-044.JPG', name: 'D1238-044', credit: 'חיים צח · לע"מ' },
+      { src: 'D1231-118.JPG', name: 'D1231-118', credit: 'חיים צח · לע"מ' },
+      { src: 'D1190-131.JPG', name: 'D1190-131', credit: 'חיים צח · לע"מ' },
+      { src: 'D1227-134.JPG', name: 'D1227-134', credit: 'קובי גדעון · לע"מ' },
+      { src: 'D1166-121.JPG', name: 'D1166-121', credit: 'עמוס בן גרשום · לע"מ' },
+      { src: 'D1164-015.JPG', name: 'D1164-015', credit: 'עמוס בן גרשום · לע"מ' },
+      { src: 'D1111-118.JPG', name: 'D1111-118', credit: 'צלם לא צוין · לע"מ' },
+      { src: 'D1153-046.JPG', name: 'D1153-046', credit: 'קובי גדעון · לע"מ' },
+      { src: 'D1111-116.JPG', name: 'D1111-116', credit: 'צלם לא צוין · לע"מ' },
+      { src: 'D1139-003.jpg', name: 'D1139-003', credit: 'קובי גדעון · לע"מ' },
+      { src: 'D1111-078.JPG', name: 'D1111-078', credit: 'צלם לא צוין · לע"מ' },
+      { src: 'D1108-035.JPG', name: 'D1108-035', credit: 'עמוס בן גרשום · לע"מ' },
+      { src: '1121.png',      name: '1121',      credit: 'נועם מושקוביץ · דוברות הכנסת' },
+      { src: 'D968-012.jpg',  name: 'D968-012',  credit: 'עמוס בן גרשום · לע"מ' },
+    ];
+
+    const DOT_POSITIONS = [
+      {x:0.20, y:0.35}, {x:0.42, y:0.60}, {x:0.65, y:0.28}, {x:0.78, y:0.65},
+      {x:0.50, y:0.50}, {x:0.15, y:0.72}, {x:0.85, y:0.18}, {x:0.32, y:0.15},
+      {x:0.60, y:0.80}, {x:0.88, y:0.45}, {x:0.12, y:0.50}, {x:0.48, y:0.25},
+      {x:0.72, y:0.55}, {x:0.28, y:0.85}, {x:0.55, y:0.12}, {x:0.90, y:0.75},
+    ];
+
+    const IMAGE_DURATION = 3000; // כמה זמן כל תמונה נשארת פתוחה במלואה (ms)
+    const EXPAND_MS = 700;
+    const COLLAPSE_MS = 600;
+    const GAP_MS = 400; // הפסקה בין תמונה לתמונה
+
+    const viewer = document.getElementById('sessionViewer');
+    const dotsCanvas = document.getElementById('dotsCanvas');
+    const dotsCtx = dotsCanvas.getContext('2d');
+    const DOT_R = 7;
+
+    function shuffleArray(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function resizeDots() {
+      const dpr = window.devicePixelRatio || 1;
+      dotsCanvas.width = viewer.offsetWidth * dpr;
+      dotsCanvas.height = viewer.offsetHeight * dpr;
+      dotsCanvas.style.width = viewer.offsetWidth + 'px';
+      dotsCanvas.style.height = viewer.offsetHeight + 'px';
+      dotsCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawDots();
+    }
+
+    let currentPositionToImage = [];
+
+    function drawDots() {
+      const W = viewer.offsetWidth, H = viewer.offsetHeight;
+      dotsCtx.clearRect(0, 0, W, H);
+      for (let i = 0; i < DOT_POSITIONS.length; i++) {
+        const pos = DOT_POSITIONS[i];
+        const cx = pos.x * W, cy = pos.y * H;
+        dotsCtx.beginPath();
+        dotsCtx.arc(cx, cy, DOT_R, 0, Math.PI * 2);
+        dotsCtx.fillStyle = '#FF0000';
+        dotsCtx.fill();
+
+        const imgData = currentPositionToImage[i];
+        if (imgData && imgData.credit) {
+          dotsCtx.font = '300 8px Ratzif22, sans-serif';
+          dotsCtx.fillStyle = '#FF0000';
+          dotsCtx.textAlign = 'center';
+          dotsCtx.direction = 'rtl';
+          dotsCtx.fillText(imgData.credit, cx, cy + DOT_R + 12);
+        }
+      }
+    }
+
+    window.addEventListener('resize', resizeDots);
+
+    function preloadImages(items) {
+      return Promise.all(items.map(item => new Promise(r => {
+        const img = new Image();
+        img.onload = r; img.onerror = r;
+        img.src = item.src;
+      })));
+    }
+
+    function animateImage(imgSrc, dotPos) {
+      return new Promise(resolveAnim => {
+        const originX = (dotPos.x * 100).toFixed(2) + '%';
+        const originY = (dotPos.y * 100).toFixed(2) + '%';
+
+        const imgEl = document.createElement('img');
+        imgEl.className = 'session-img';
+        imgEl.src = imgSrc;
+        imgEl.style.transformOrigin = originX + ' ' + originY;
+        viewer.appendChild(imgEl);
+
+        function startExpand() {
+          const startTime = performance.now();
+          function expandFrame(ts) {
+            const prog = Math.min(1, (ts - startTime) / EXPAND_MS);
+            const ease = 1 - Math.pow(1 - prog, 3);
+            imgEl.style.transform = 'scale(' + ease + ')';
+            if (prog < 1) {
+              requestAnimationFrame(expandFrame);
+            } else {
+              imgEl.style.transform = 'scale(1)';
+              setTimeout(() => {
+                const colStart = performance.now();
+                function collapseFrame(ts2) {
+                  const p = Math.min(1, (ts2 - colStart) / COLLAPSE_MS);
+                  const ease2 = Math.pow(p, 3);
+                  const scale = 1 - ease2;
+                  imgEl.style.transform = 'scale(' + scale + ')';
+                  if (p < 1) {
+                    requestAnimationFrame(collapseFrame);
+                  } else {
+                    viewer.removeChild(imgEl);
+                    resolveAnim();
+                  }
+                }
+                requestAnimationFrame(collapseFrame);
+              }, IMAGE_DURATION);
+            }
+          }
+          requestAnimationFrame(expandFrame);
+        }
+
+        if (imgEl.decode) {
+          imgEl.decode().then(startExpand).catch(startExpand);
+        } else {
+          startExpand();
+        }
+      });
+    }
+
+    async function runCycle() {
+      const shuffledImages = shuffleArray(IMAGES);
+      const dotOrder = shuffleArray([...Array(shuffledImages.length).keys()]);
+
+      // Decide up-front which image will appear at which dot position, so the
+      // credit label under each dot can be shown before that image opens.
+      currentPositionToImage = new Array(DOT_POSITIONS.length);
+      dotOrder.forEach((posIdx, imgIdx) => {
+        currentPositionToImage[posIdx % DOT_POSITIONS.length] = shuffledImages[imgIdx];
+      });
+      drawDots();
+
+      await preloadImages(shuffledImages);
+
+      for (let i = 0; i < shuffledImages.length; i++) {
+        const imgData = shuffledImages[i];
+        const dotPos = DOT_POSITIONS[dotOrder[i] % DOT_POSITIONS.length];
+        await animateImage(imgData.src, dotPos);
+        await new Promise(r => setTimeout(r, GAP_MS));
+      }
+    }
+
+    async function runForever() {
+      // ודא שהפונט המותאם אישית נטען לפני הציור הראשון על ה-canvas
+      try {
+        await document.fonts.load('300 8px Ratzif22');
+        await document.fonts.ready;
+      } catch (e) {}
+
+      resizeDots();
+      while (true) {
+        await runCycle();
+      }
+    }
+
+    runForever();
+  })();
+
+  // ═══════════════════════════════════════════════════════════════
   // SCENE SWITCHING — לחיצה על רווח עוברת לאנימציה הבאה
   // ═══════════════════════════════════════════════════════════════
   (function () {
@@ -1649,7 +1880,8 @@
       document.getElementById('sceneB'),
       document.getElementById('sceneC'),
       document.getElementById('sceneD'),
-      document.getElementById('sceneSplash')
+      document.getElementById('sceneSplash'),
+      document.getElementById('sceneSession')
     ];
     var current = 0;
 
