@@ -550,6 +550,18 @@
     pointer-events: none;
   }
 
+  @keyframes dpFade {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 1; }
+  }
+  @keyframes dpDash {
+    to { stroke-dashoffset: -60; }
+  }
+  @keyframes dpCrossPulse {
+    0%, 100% { transform: scale(1); opacity: 0.55; }
+    50% { transform: scale(1.3); opacity: 1; }
+  }
+
   /* טבעת פועמת (כמו נקודת מבט) */
   .dataposter-ring {
     position: absolute;
@@ -568,18 +580,21 @@
     background: #FF0000;
   }
 
-  /* מלבן AOI */
+  /* מלבן AOI - דוהה ומבליח */
   .dataposter-aoi {
     position: absolute;
     border: 1px solid rgba(255,0,0,0.75);
+    animation: dpFade 2.8s ease-in-out infinite;
   }
 
-  /* צלב קטן (crosshair) */
+  /* צלב קטן (crosshair) - פועם */
   .dataposter-cross {
     position: absolute;
     width: 16px;
     height: 16px;
     margin: -8px 0 0 -8px;
+    transform-origin: center;
+    animation: dpCrossPulse 1.8s ease-in-out infinite;
   }
   .dataposter-cross::before, .dataposter-cross::after {
     content: '';
@@ -588,6 +603,16 @@
   }
   .dataposter-cross::before { left: 50%; top: 0; width: 1px; height: 100%; margin-left: -0.5px; }
   .dataposter-cross::after  { top: 50%; left: 0; height: 1px; width: 100%; margin-top: -0.5px; }
+
+  /* תווית קטנה - דוהה */
+  .dataposter-label {
+    animation: dpFade 2.4s ease-in-out infinite;
+  }
+
+  /* קו מקווקו מונפש (marching ants) */
+  .dataposter-line {
+    animation: dpDash 1.1s linear infinite;
+  }
 
   .dataposter-svg {
     position: absolute;
@@ -2622,6 +2647,33 @@
       });
     }
 
+    function localCountUp(el, target, duration) {
+      (async function loop() {
+        while (true) {
+          await animateVal(el, 0, target, duration);
+          await new Promise(r => setTimeout(r, 200));
+          await animateVal(el, target, 0, duration);
+          await new Promise(r => setTimeout(r, 200));
+        }
+      })();
+    }
+
+    function animateVal(el, from, to, duration) {
+      const start = performance.now();
+      return new Promise(resolve => {
+        function step(now) {
+          const t = Math.min(1, (now - start) / duration);
+          const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+          const val = from + (to - from) * eased;
+          el.textContent = val.toFixed(2).padStart(5, '0');
+          if (t < 1 && el.isConnected) requestAnimationFrame(step);
+          else if (el.isConnected) { el.textContent = to.toFixed(2).padStart(5, '0'); resolve(); }
+          else resolve();
+        }
+        requestAnimationFrame(step);
+      });
+    }
+
     function makeStatLine(container, topPct, label) {
       const line = document.createElement('div');
       line.className = 'splash-statline';
@@ -2630,20 +2682,23 @@
       line.style.left = '8%';
       line.style.right = '8%';
       line.style.width = 'auto';
-      const n1 = rnd(0, 100).toFixed(2).padStart(5, '0');
-      const n2 = rnd(0, 100).toFixed(2).padStart(5, '0');
-      line.innerHTML = `<span class="num">${n1}</span><span class="line"></span><span class="label">${label}</span><span class="line"></span><span class="num">${n2}</span>`;
+      line.innerHTML = `<span class="num">00.00</span><span class="line"></span><span class="label">${label}</span><span class="line"></span><span class="num">00.00</span>`;
       container.appendChild(line);
+      const nums = line.querySelectorAll('.num');
+      localCountUp(nums[0], rnd(20, 99), rnd(1400, 2200));
+      localCountUp(nums[1], rnd(20, 99), rnd(1400, 2200));
     }
 
     function makeTinyLabels(container, count) {
       for (let i = 0; i < count; i++) {
         const el = document.createElement('span');
-        el.className = 'splash-tiny' + (Math.random() < 0.4 ? ' thin' : '');
+        el.className = 'splash-tiny dataposter-label' + (Math.random() < 0.4 ? ' thin' : '');
         el.textContent = pick(LABELS) + ' / ' + Math.round(rnd(0, 99));
         el.style.position = 'absolute';
         el.style.left = rnd(4, 80).toFixed(2) + '%';
         el.style.top = rnd(4, 94).toFixed(2) + '%';
+        el.style.animationDelay = rnd(0, 2.4).toFixed(2) + 's';
+        el.style.animationDuration = rnd(1.8, 3.2).toFixed(2) + 's';
         container.appendChild(el);
       }
     }
@@ -2655,6 +2710,7 @@
         el.style.left = rnd(6, 94).toFixed(2) + '%';
         el.style.top = rnd(6, 94).toFixed(2) + '%';
         el.style.animationDelay = rnd(0, 1.6).toFixed(2) + 's';
+        el.style.animationDuration = rnd(1.2, 2.2).toFixed(2) + 's';
         container.appendChild(el);
       }
     }
@@ -2668,6 +2724,8 @@
         el.style.top = rnd(2, 96 - h).toFixed(2) + '%';
         el.style.width = w.toFixed(2) + '%';
         el.style.height = h.toFixed(2) + '%';
+        el.style.animationDelay = rnd(0, 2.8).toFixed(2) + 's';
+        el.style.animationDuration = rnd(2.2, 3.6).toFixed(2) + 's';
         container.appendChild(el);
       }
     }
@@ -2678,6 +2736,8 @@
         el.className = 'dataposter-cross';
         el.style.left = rnd(4, 96).toFixed(2) + '%';
         el.style.top = rnd(4, 96).toFixed(2) + '%';
+        el.style.animationDelay = rnd(0, 1.8).toFixed(2) + 's';
+        el.style.animationDuration = rnd(1.4, 2.4).toFixed(2) + 's';
         container.appendChild(el);
       }
     }
@@ -2714,6 +2774,9 @@
         line.setAttribute('stroke-width', '1.4');
         line.setAttribute('stroke-dasharray', '4 6');
         line.setAttribute('marker-end', 'url(#dpArrow)');
+        line.setAttribute('class', 'dataposter-line');
+        line.style.animationDelay = rnd(0, 1.1).toFixed(2) + 's';
+        line.style.animationDuration = rnd(0.8, 1.6).toFixed(2) + 's';
         svg.appendChild(line);
       }
       container.appendChild(svg);
