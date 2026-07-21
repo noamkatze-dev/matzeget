@@ -1096,9 +1096,13 @@
     const FAST_LERP = 0.35;
     const FAST_PHASE_MS = 220;
 
-    function pickNewSimTarget(){
+    function triggerFreshJump(){
       simGX=0.12+Math.random()*0.76; simGY=0.12+Math.random()*0.76;
       fastPhaseUntil = performance.now() + FAST_PHASE_MS;
+    }
+
+    function pickNewSimTarget(){
+      triggerFreshJump();
       const dwell=SIM_MIN_DWELL+Math.random()*(SIM_MAX_DWELL-SIM_MIN_DWELL);
       setTimeout(pickNewSimTarget, dwell);
     }
@@ -1281,7 +1285,10 @@
     // חושף החוצה כדי שמנגנון החלפת הסצנות יוכל לעצור/להפעיל מחדש את הלולאה
     window.__sceneD_setRunning = function (val) {
       running = val;
-      if (running) requestAnimationFrame(mainLoop);
+      if (running) {
+        triggerFreshJump(); // קפיצה טרייה מיד עם ההפעלה, כדי שסקאדה תופיע כבר בהתחלה
+        requestAnimationFrame(mainLoop);
+      }
     };
 
     // חשיפה זמנית לצורך דיבאג מהקונסולה - אפשר להריץ:
