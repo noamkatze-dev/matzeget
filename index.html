@@ -1138,7 +1138,7 @@
       ctx.fillStyle = 'rgba(255,0,0,0.82)';
       for (const p of dotPts) {
         const sx = fit.oX + p.nx*fit.dW, sy = fit.oY + p.ny*fit.dH;
-        ctx.fillRect(sx-1, sy-1, 2, 2);
+        ctx.beginPath(); ctx.arc(sx, sy, 1, 0, Math.PI*2); ctx.fill();
       }
       for (const r of aoiRegions) {
         const cx=fit.oX+r.cx*fit.dW, cy=fit.oY+r.cy*fit.dH;
