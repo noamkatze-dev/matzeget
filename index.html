@@ -1348,6 +1348,7 @@
       if (srcVideo.videoWidth) applyRealVideoSize();
 
       window.addEventListener('resize', updateGapsForLetterbox);
+      window.__sceneD_updateGaps = updateGapsForLetterbox;
 
       pickNewSimTarget();
       running = true;
@@ -1402,6 +1403,7 @@
       current = (current + 1) % scenes.length;
       scenes[current].classList.add('active');
       if (scenes[current].id === 'sceneD' && window.__sceneD_setRunning) window.__sceneD_setRunning(true);
+      if (scenes[current].id === 'sceneD' && window.__sceneD_updateGaps) window.__sceneD_updateGaps();
     });
   })();
 </script>
