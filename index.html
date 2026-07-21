@@ -132,7 +132,10 @@
   #sceneD {
     background: #ffffff;
     overflow-y: auto;
-    align-items: flex-start;
+    /* "safe center" ממרכז את התוכן אנכית כשהוא נכנס למסך,
+       אבל אם התוכן גבוה מדי - מאפשר עדיין לגלול ולראות את הכל,
+       במקום להידבק תמיד לחלק העליון. */
+    align-items: safe center;
   }
   #sceneD-wrap {
     max-width: 1200px;
