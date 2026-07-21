@@ -148,7 +148,6 @@
   #sceneD .sceneD-panel {
     display: flex;
     flex-direction: column;
-    border: 1px solid #eee;
     overflow: hidden;
     background: #fff;
   }
@@ -195,7 +194,7 @@
   <div id="sceneD-wrap">
     <div id="sceneD-grid"></div>
   </div>
-  <video id="sceneD-srcVideo" src="statue.mp4" autoplay muted loop playsinline style="display:none"></video>
+  <video id="sceneD-srcVideo" src="statue.mp4" autoplay muted loop playsinline style="position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;"></video>
   <canvas id="sceneD-anaC" width="160" height="90" style="display:none"></canvas>
   <canvas id="sceneD-preC" width="160" height="90" style="display:none"></canvas>
   <canvas id="sceneD-aoiC" width="320" height="180" style="display:none"></canvas>
@@ -1259,9 +1258,11 @@
       heatCanvas.width=W_HEAT; heatCanvas.height=H_HEAT;
       heatCtx=heatCanvas.getContext('2d');
 
-      srcVideo.addEventListener('loadedmetadata', () => { videoW=srcVideo.videoWidth; videoH=srcVideo.videoHeight; });
-      if (srcVideo.readyState<2) await new Promise(r=>srcVideo.addEventListener('canplay', r, {once:true}));
-      videoW=srcVideo.videoWidth; videoH=srcVideo.videoHeight;
+      srcVideo.addEventListener('loadedmetadata', () => {
+        videoW=srcVideo.videoWidth; videoH=srcVideo.videoHeight;
+      });
+      srcVideo.play().catch(() => {});
+      if (srcVideo.videoWidth) { videoW=srcVideo.videoWidth; videoH=srcVideo.videoHeight; }
 
       pickNewSimTarget();
       running = true;
