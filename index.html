@@ -1141,9 +1141,9 @@
         ctx.fillRect(sx-1, sy-1, 2, 2);
       }
       for (const r of aoiRegions) {
-        const sx=fit.oX+r.x*fit.dW, sy=fit.oY+r.y*fit.dH, sw=r.w*fit.dW, sh=r.h*fit.dH;
-        ctx.strokeStyle='rgba(255,0,0,0.75)'; ctx.lineWidth=1;
-        ctx.strokeRect(sx,sy,sw,sh);
+        const cx=fit.oX+r.cx*fit.dW, cy=fit.oY+r.cy*fit.dH;
+        ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI*2);
+        ctx.fillStyle='rgba(255,0,0,0.85)'; ctx.fill();
       }
     }
 
@@ -1188,19 +1188,26 @@
       const fit = drawVideoFrame(ctx, cw, ch);
       const recent = scanPathHistory.slice(-14);
       if (recent.length<1) return;
+      const NODE_R = 8;
       if (recent.length>=2) {
         ctx.save(); ctx.setLineDash([3,5]);
         ctx.strokeStyle='rgba(255,0,0,0.6)'; ctx.lineWidth=1.2;
-        ctx.beginPath();
-        recent.forEach((f,i)=>{
-          const x=fit.oX+f.x*fit.dW, y=fit.oY+f.y*fit.dH;
-          i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
-        });
-        ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+        for (let i=0;i<recent.length-1;i++){
+          const ax=fit.oX+recent[i].x*fit.dW, ay=fit.oY+recent[i].y*fit.dH;
+          const bx=fit.oX+recent[i+1].x*fit.dW, by=fit.oY+recent[i+1].y*fit.dH;
+          const dx=bx-ax, dy=by-ay, dist=Math.hypot(dx,dy);
+          if (dist < NODE_R*2) continue;
+          const ux=dx/dist, uy=dy/dist;
+          ctx.beginPath();
+          ctx.moveTo(ax+ux*NODE_R, ay+uy*NODE_R);
+          ctx.lineTo(bx-ux*NODE_R, by-uy*NODE_R);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]); ctx.restore();
       }
       recent.forEach((f,i)=>{
         const cx=fit.oX+f.x*fit.dW, cy=fit.oY+f.y*fit.dH;
-        ctx.beginPath(); ctx.arc(cx,cy,8,0,Math.PI*2);
+        ctx.beginPath(); ctx.arc(cx,cy,NODE_R,0,Math.PI*2);
         ctx.strokeStyle='rgba(255,0,0,1)'; ctx.lineWidth=1.5; ctx.stroke();
       });
     }
