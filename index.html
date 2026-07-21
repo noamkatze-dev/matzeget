@@ -1323,8 +1323,13 @@
         const pillarbox = Math.max(0, cw - dW); // שוליים לבנים משמאל+מימין בתוך כל תיבה
         const letterbox = Math.max(0, ch - dH); // שוליים לבנים מלמעלה+מלמטה בתוך כל תיבה
 
-        const colGap = Math.max(0, BASE_GAP - pillarbox);
-        const rowGap = Math.max(0, BASE_GAP - letterbox);
+        // אם השוליים הפנימיים בכיוון מסוים גדולים יותר מ-BASE_GAP עצמו,
+        // אי אפשר "לצמצם" את ה-grid-gap מתחת לאפס כדי לפצות. לכן היעד
+        // הכולל (letterbox/pillarbox + gap) נקבע כמקסימום מבין השוליים
+        // בפועל לבין BASE_GAP - וכך שני הכיוונים תמיד יוצאים שווים בדיוק.
+        const target = Math.max(BASE_GAP, pillarbox, letterbox);
+        const colGap = target - pillarbox;
+        const rowGap = target - letterbox;
 
         grid.style.setProperty('--sceneD-gap-col', colGap + 'px');
         grid.style.setProperty('--sceneD-gap-row', rowGap + 'px');
