@@ -2342,9 +2342,27 @@
           ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
           ctx.strokeStyle = RED; ctx.lineWidth = 2; ctx.stroke();
           if (fix.duration > 0) {
-            ctx.fillStyle = RED; ctx.font = `700 10px HaimVariable, ${FONT_FAMILY}`;
-            ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-            ctx.fillText(Math.round(fix.duration) + 'ms', cx, cy + r + 13);
+            const numStr = String(Math.round(fix.duration));
+            const unitStr = 'ms';
+            const numFont = `700 10px ${FONT_FAMILY}`;
+            const unitFont = `700 10px HaimVariable`;
+            ctx.fillStyle = RED;
+            ctx.textBaseline = 'alphabetic';
+
+            ctx.font = numFont;
+            const numW = ctx.measureText(numStr).width;
+            ctx.font = unitFont;
+            const unitW = ctx.measureText(unitStr).width;
+
+            const totalW = numW + unitW;
+            const startX = cx - totalW / 2;
+            const y = cy + r + 13;
+
+            ctx.textAlign = 'left';
+            ctx.font = numFont;
+            ctx.fillText(numStr, startX, y);
+            ctx.font = unitFont;
+            ctx.fillText(unitStr, startX + numW, y);
           }
         }
       }
