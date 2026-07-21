@@ -1091,15 +1091,21 @@
       }
     }
 
+    let fastPhaseUntil = 0;
+    const FAST_LERP = 0.35;
+    const FAST_PHASE_MS = 220;
+
     function pickNewSimTarget(){
       simGX=0.12+Math.random()*0.76; simGY=0.12+Math.random()*0.76;
+      fastPhaseUntil = performance.now() + FAST_PHASE_MS;
       const dwell=SIM_MIN_DWELL+Math.random()*(SIM_MAX_DWELL-SIM_MIN_DWELL);
       setTimeout(pickNewSimTarget, dwell);
     }
 
     function applyGaze(ts){
-      rawGX += (simGX-rawGX)*SIM_DRIFT_LERP;
-      rawGY += (simGY-rawGY)*SIM_DRIFT_LERP;
+      const lerp = ts < fastPhaseUntil ? FAST_LERP : SIM_DRIFT_LERP;
+      rawGX += (simGX-rawGX)*lerp;
+      rawGY += (simGY-rawGY)*lerp;
       sGX += (rawGX-sGX)*GAZE_LERP;
       sGY += (rawGY-sGY)*GAZE_LERP;
       gazeHistory.push({x:sGX,y:sGY,ts}); if(gazeHistory.length>90) gazeHistory.shift();
