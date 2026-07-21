@@ -108,7 +108,7 @@
     font-family: 'Courier New', Courier, monospace;
     font-size: 11px;
     font-weight: 700;
-    color: #ff1500;
+    color: #FF0000;
     letter-spacing: 0.06em;
     white-space: nowrap;
     text-shadow: none;
@@ -120,7 +120,7 @@
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    border: 3px solid rgba(255,21,0,0.85);
+    border: 3px solid rgba(255,0,0,0.85);
     box-shadow: none;
     transform: translate(-50%, -50%);
     pointer-events: none;
@@ -630,7 +630,7 @@
     function drawDots(pts) {
       const W = dotCanvas.width, H = dotCanvas.height;
       dotCtx.clearRect(0, 0, W, H);
-      dotCtx.fillStyle = 'rgba(255,21,0,0.82)';
+      dotCtx.fillStyle = 'rgba(255,0,0,0.82)';
       dotCtx.beginPath();
       for (const p of pts) {
         const sx = renderOffX + p.nx * renderW;
@@ -1135,14 +1135,14 @@
 
     function drawGazePanel(ctx, cw, ch){
       const fit = drawVideoFrame(ctx, cw, ch);
-      ctx.fillStyle = 'rgba(224,26,0,0.82)';
+      ctx.fillStyle = 'rgba(255,0,0,0.82)';
       for (const p of dotPts) {
         const sx = fit.oX + p.nx*fit.dW, sy = fit.oY + p.ny*fit.dH;
         ctx.fillRect(sx-1, sy-1, 2, 2);
       }
       for (const r of aoiRegions) {
         const sx=fit.oX+r.x*fit.dW, sy=fit.oY+r.y*fit.dH, sw=r.w*fit.dW, sh=r.h*fit.dH;
-        ctx.strokeStyle='rgba(224,26,0,0.75)'; ctx.lineWidth=1;
+        ctx.strokeStyle='rgba(255,0,0,0.75)'; ctx.lineWidth=1;
         ctx.strokeRect(sx,sy,sw,sh);
       }
     }
@@ -1155,15 +1155,15 @@
         const cx=fit.oX+fix.x*fit.dW, cy=fit.oY+fix.y*fit.dH;
         const r=Math.min(6+fix.duration/90,26);
         ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
-        ctx.fillStyle=`rgba(224,26,0,${opacity*0.18})`; ctx.fill();
+        ctx.fillStyle=`rgba(255,0,0,${opacity*0.18})`; ctx.fill();
         ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
-        ctx.strokeStyle=`rgba(224,26,0,${opacity})`; ctx.lineWidth=1.5; ctx.stroke();
+        ctx.strokeStyle=`rgba(255,0,0,${opacity})`; ctx.lineWidth=1.5; ctx.stroke();
       }
       if (currentFixation) {
         const pulse=2+Math.sin(ts/160)*2;
         const cx=fit.oX+currentFixation.cx*fit.dW, cy=fit.oY+currentFixation.cy*fit.dH;
         ctx.beginPath(); ctx.arc(cx,cy,pulse,0,Math.PI*2);
-        ctx.fillStyle='rgba(224,26,0,1)'; ctx.fill();
+        ctx.fillStyle='rgba(255,0,0,1)'; ctx.fill();
       }
     }
 
@@ -1175,12 +1175,12 @@
         const fx=fit.oX+sac.fromX*fit.dW, fy=fit.oY+sac.fromY*fit.dH;
         const tx=fit.oX+sac.toX*fit.dW,   ty=fit.oY+sac.toY*fit.dH;
         ctx.beginPath(); ctx.moveTo(fx,fy); ctx.lineTo(tx,ty);
-        ctx.strokeStyle=`rgba(224,26,0,${opacity})`; ctx.lineWidth=1.5; ctx.stroke();
+        ctx.strokeStyle=`rgba(255,0,0,${opacity})`; ctx.lineWidth=1.5; ctx.stroke();
         const angle=Math.atan2(ty-fy,tx-fx), aLen=8;
         ctx.beginPath(); ctx.moveTo(tx,ty);
         ctx.lineTo(tx-aLen*Math.cos(angle-Math.PI/6),ty-aLen*Math.sin(angle-Math.PI/6));
         ctx.lineTo(tx-aLen*Math.cos(angle+Math.PI/6),ty-aLen*Math.sin(angle+Math.PI/6));
-        ctx.closePath(); ctx.fillStyle=`rgba(224,26,0,${opacity})`; ctx.fill();
+        ctx.closePath(); ctx.fillStyle=`rgba(255,0,0,${opacity})`; ctx.fill();
       }
     }
 
@@ -1190,7 +1190,7 @@
       if (recent.length<1) return;
       if (recent.length>=2) {
         ctx.save(); ctx.setLineDash([3,5]);
-        ctx.strokeStyle='rgba(224,26,0,0.6)'; ctx.lineWidth=1.2;
+        ctx.strokeStyle='rgba(255,0,0,0.6)'; ctx.lineWidth=1.2;
         ctx.beginPath();
         recent.forEach((f,i)=>{
           const x=fit.oX+f.x*fit.dW, y=fit.oY+f.y*fit.dH;
@@ -1201,7 +1201,7 @@
       recent.forEach((f,i)=>{
         const cx=fit.oX+f.x*fit.dW, cy=fit.oY+f.y*fit.dH;
         ctx.beginPath(); ctx.arc(cx,cy,8,0,Math.PI*2);
-        ctx.strokeStyle='rgba(224,26,0,1)'; ctx.lineWidth=1.5; ctx.stroke();
+        ctx.strokeStyle='rgba(255,0,0,1)'; ctx.lineWidth=1.5; ctx.stroke();
       });
     }
 
@@ -1232,9 +1232,9 @@
       const cx=fit.oX+firstFix.x*fit.dW, cy=fit.oY+firstFix.y*fit.dH;
       const pulse=12+Math.sin(ts/400)*4;
       ctx.beginPath(); ctx.arc(cx,cy,pulse,0,Math.PI*2);
-      ctx.strokeStyle='rgba(224,26,0,0.35)'; ctx.lineWidth=1.2; ctx.stroke();
+      ctx.strokeStyle='rgba(255,0,0,0.35)'; ctx.lineWidth=1.2; ctx.stroke();
       ctx.beginPath(); ctx.arc(cx,cy,9,0,Math.PI*2);
-      ctx.fillStyle='rgba(224,26,0,1)'; ctx.fill();
+      ctx.fillStyle='rgba(255,0,0,1)'; ctx.fill();
     }
 
     const DRAWERS = {
