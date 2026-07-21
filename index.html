@@ -20,6 +20,7 @@
     height: 100%;
     overflow: hidden;
     background: #000;
+    font-family: 'Ratzif22', sans-serif;
   }
 
   /* ── SCENE SPLASH: מסך פתיחה עם וידאו + גריד נתונים + לוגו ── */
@@ -231,7 +232,7 @@
   }
   #sceneC-annLayer .ann {
     position: absolute;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'Ratzif22', sans-serif;
     font-size: 11px;
     font-weight: 700;
     color: #FF0000;
@@ -456,6 +457,7 @@
     p.setup = function () {
       const cnv = p.createCanvas(FINAL_CANVAS_WIDTH, FINAL_CANVAS_HEIGHT);
       cnv.parent('sceneB');
+      p.textFont('Ratzif22');
 
       video.hide();
       video.volume(0);
