@@ -159,7 +159,11 @@
   #sceneD .sceneD-panel-canvas-wrap {
     position: relative;
     width: 100%;
-    aspect-ratio: 4 / 3;
+    /* יחס-הגובה-רוחב מתעדכן דינמית ל-יחס האמיתי של הסרטון (ב-JS),
+       כך שהתיבה מתאימה בדיוק לסרטון - בלי שוליים לבנים פנימיים
+       ובלי לשנות את גודל/יחס הסרטון עצמו. עד שהוא נטען, נופלים
+       חזרה ל-4:3 כברירת מחדל. */
+    aspect-ratio: var(--videoAR, 4 / 3);
     background: #ffffff;
     overflow: hidden;
   }
@@ -1120,43 +1124,34 @@
       gazeHistory.push({x:sGX,y:sGY,ts}); if(gazeHistory.length>90) gazeHistory.shift();
     }
 
-    /* ── COVER FIT (במקום CONTAIN) ──────────────────────────────────
-       זהו התיקון המרכזי: קודם הווידאו הוצג ביחס "contain" (עם פס לבן
-       מסביב בתוך התא, letterboxing/pillarboxing), מה שגרם למרווח
-       הנראה-לעין בין הסרטונים להיות שונה מהמרווח המוגדר ב-CSS grid-gap
-       (כי היה נוסף שוליים לבנים פנימיים מעבר לרווח עצמו).
-       עכשיו הווידאו ממלא את כל תא (cover, עם חיתוך קל בקצוות),
-       כך שהמרווח היחיד שנשאר בין הפאנלים הוא בדיוק ה-grid-gap,
-       וזה זהה אופקית ואנכית (row-gap === column-gap === --sceneD-gap).
-    */
-    function getVideoFitCover(cw, ch){
+    /* ── CONTAIN FIT — הסרטון נשאר בדיוק באותו גודל/יחס, בלי חיתוך ──
+       הבעיה הקודמת לא הייתה בסרטון עצמו אלא בכך שהתא (הריבוע הלבן
+       סביבו) היה קבוע ביחס 4:3, בעוד הסרטון עצמו ביחס אחר - מה שיצר
+       שוליים לבנים נוספים (letterboxing) בתוך התא, מעבר לרווח שבין
+       הפאנלים. עכשיו במקום זאת התא עצמו מקבל את יחס-הגובה-רוחב
+       האמיתי של הסרטון (ראו --videoAR ב-CSS), כך שהסרטון ממלא את
+       התא בשלמותו ובגודלו/יחסו המקורי - ונשאר רק ה-grid-gap כמרווח,
+       זהה אופקית ואנכית. */
+    function getVideoFitContain(cw, ch){
       const cR=cw/ch, vR=videoW/videoH;
-      let sx, sy, sw, sh;
+      let dW, dH, oX, oY;
       if (vR > cR) {
-        // הווידאו רחב יחסית לתא -> חותכים משמאל/מימין
-        sh = videoH;
-        sw = sh * cR;
-        sx = (videoW - sw) / 2;
-        sy = 0;
+        dW = cw; dH = dW / vR;
+        oX = 0; oY = (ch - dH) / 2;
       } else {
-        // הווידאו גבוה יחסית לתא -> חותכים מלמעלה/מלמטה
-        sw = videoW;
-        sh = sw / cR;
-        sx = 0;
-        sy = (videoH - sh) / 2;
+        dH = ch; dW = vR * dH;
+        oX = (cw - dW) / 2; oY = 0;
       }
-      return { sx, sy, sw, sh };
+      return { dW, dH, oX, oY };
     }
 
     function drawVideoFrame(ctx, cw, ch){
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0,0,cw,ch);
       if (videoW<=1) return {dW:cw,dH:ch,oX:0,oY:0}; // הווידאו עוד לא נטען - השכבה עדיין תצויר בגודל מלא
-      const fit = getVideoFitCover(cw,ch);
-      ctx.drawImage(srcVideo, fit.sx, fit.sy, fit.sw, fit.sh, 0, 0, cw, ch);
-      // הווידאו ממלא את כל התא (ללא letterboxing), לכן ה-offset תמיד 0
-      // וממדי ה-"תצוגה" זהים למידות התא עצמו.
-      return { dW: cw, dH: ch, oX: 0, oY: 0 };
+      const fit = getVideoFitContain(cw,ch);
+      ctx.drawImage(srcVideo, fit.oX, fit.oY, fit.dW, fit.dH);
+      return fit;
     }
 
     function drawGazePanel(ctx, cw, ch){
@@ -1305,11 +1300,19 @@
       heatCanvas.width=W_HEAT; heatCanvas.height=H_HEAT;
       heatCtx=heatCanvas.getContext('2d');
 
-      srcVideo.addEventListener('loadedmetadata', () => {
-        videoW=srcVideo.videoWidth; videoH=srcVideo.videoHeight;
-      });
+      function applyRealAspectRatio() {
+        videoW = srcVideo.videoWidth;
+        videoH = srcVideo.videoHeight;
+        if (videoW > 0 && videoH > 0) {
+          // התיבה של כל פאנל מקבלת עכשיו את יחס-הגובה-רוחב האמיתי
+          // של הסרטון, כדי שהוא ימלא אותה בשלמותו בלי שוליים פנימיים.
+          grid.style.setProperty('--videoAR', videoW + ' / ' + videoH);
+          sizePanels();
+        }
+      }
+      srcVideo.addEventListener('loadedmetadata', applyRealAspectRatio);
       srcVideo.play().catch(() => {});
-      if (srcVideo.videoWidth) { videoW=srcVideo.videoWidth; videoH=srcVideo.videoHeight; }
+      if (srcVideo.videoWidth) applyRealAspectRatio();
 
       pickNewSimTarget();
       running = true;
