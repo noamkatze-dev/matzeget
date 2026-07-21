@@ -519,6 +519,83 @@
     font-weight: 700;
     color: #FF0000;
   }
+  /* ── SCENE DATA WHITE / DATA VIDEO: כל הנתונים הויזואליים מפוזרים ── */
+  #sceneDataWhite, #sceneDataVideo {
+    background: #ffffff;
+    overflow: hidden;
+  }
+
+  .dataposter-stage {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  #dataVideoBg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .dataposter-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  /* טבעת פועמת (כמו נקודת מבט) */
+  .dataposter-ring {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    margin: -11px 0 0 -11px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,0,0,0.85);
+    animation: spectrumPulse 1.6s ease-in-out infinite;
+  }
+  .dataposter-ring::after {
+    content: '';
+    position: absolute;
+    inset: 7px;
+    border-radius: 50%;
+    background: #FF0000;
+  }
+
+  /* מלבן AOI */
+  .dataposter-aoi {
+    position: absolute;
+    border: 1px solid rgba(255,0,0,0.75);
+  }
+
+  /* צלב קטן (crosshair) */
+  .dataposter-cross {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+  }
+  .dataposter-cross::before, .dataposter-cross::after {
+    content: '';
+    position: absolute;
+    background: rgba(255,0,0,0.8);
+  }
+  .dataposter-cross::before { left: 50%; top: 0; width: 1px; height: 100%; margin-left: -0.5px; }
+  .dataposter-cross::after  { top: 50%; left: 0; height: 1px; width: 100%; margin-top: -0.5px; }
+
+  .dataposter-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
 </style>
 </head>
 <body>
@@ -624,6 +701,23 @@
 <div id="sceneShowcase" class="scene">
   <div id="sceneShowcase-wrap">
     <div id="sceneShowcase-grid"></div>
+  </div>
+</div>
+
+<!-- SCENE DATA WHITE -->
+<div id="sceneDataWhite" class="scene">
+  <div class="dataposter-stage">
+    <div id="dataWhiteLayer" class="dataposter-layer"></div>
+  </div>
+</div>
+
+<!-- SCENE DATA VIDEO -->
+<div id="sceneDataVideo" class="scene">
+  <div class="dataposter-stage">
+    <video id="dataVideoBg" autoplay muted loop playsinline>
+      <source src="sky.mp4" type="video/mp4">
+    </video>
+    <div id="dataVideoLayer" class="dataposter-layer"></div>
   </div>
 </div>
 
@@ -2496,6 +2590,170 @@
   })();
 
   // ═══════════════════════════════════════════════════════════════
+  // SCENE DATA WHITE / DATA VIDEO — כל הנתונים הויזואליים מפוזרים
+  // ═══════════════════════════════════════════════════════════════
+  (function () {
+    'use strict';
+
+    const LABELS = ['GAZE','FIXATION','SACCADE','SCANPATH','HEATMAP','AOI','EDGE','MOTION','CONTRAST','STAB','SHARP','DETAIL','VERTICAL','HORIZONTAL','DIAGONAL','CORNER'];
+
+    function rnd(min, max) { return min + Math.random() * (max - min); }
+    function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+    function makeDots(container, count) {
+      const frag = document.createDocumentFragment();
+      for (let i = 0; i < count; i++) {
+        const dot = document.createElement('span');
+        dot.className = 'dot';
+        dot.style.setProperty('--x', rnd(2, 98).toFixed(2) + '%');
+        dot.style.setProperty('--y', rnd(2, 98).toFixed(2) + '%');
+        dot.style.setProperty('--delay', rnd(0, 5).toFixed(2) + 's');
+        dot.style.setProperty('--dur', rnd(2.5, 5.5).toFixed(2) + 's');
+        frag.appendChild(dot);
+      }
+      container.appendChild(frag);
+    }
+
+    function makeCorners(container) {
+      ['tl','tr','bl','br'].forEach(pos => {
+        const el = document.createElement('span');
+        el.className = 'splash-corner ' + pos;
+        container.appendChild(el);
+      });
+    }
+
+    function makeStatLine(container, topPct, label) {
+      const line = document.createElement('div');
+      line.className = 'splash-statline';
+      line.style.position = 'absolute';
+      line.style.top = topPct + '%';
+      line.style.left = '8%';
+      line.style.right = '8%';
+      line.style.width = 'auto';
+      const n1 = rnd(0, 100).toFixed(2).padStart(5, '0');
+      const n2 = rnd(0, 100).toFixed(2).padStart(5, '0');
+      line.innerHTML = `<span class="num">${n1}</span><span class="line"></span><span class="label">${label}</span><span class="line"></span><span class="num">${n2}</span>`;
+      container.appendChild(line);
+    }
+
+    function makeTinyLabels(container, count) {
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('span');
+        el.className = 'splash-tiny' + (Math.random() < 0.4 ? ' thin' : '');
+        el.textContent = pick(LABELS) + ' / ' + Math.round(rnd(0, 99));
+        el.style.position = 'absolute';
+        el.style.left = rnd(4, 80).toFixed(2) + '%';
+        el.style.top = rnd(4, 94).toFixed(2) + '%';
+        container.appendChild(el);
+      }
+    }
+
+    function makeRings(container, count) {
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('span');
+        el.className = 'dataposter-ring';
+        el.style.left = rnd(6, 94).toFixed(2) + '%';
+        el.style.top = rnd(6, 94).toFixed(2) + '%';
+        el.style.animationDelay = rnd(0, 1.6).toFixed(2) + 's';
+        container.appendChild(el);
+      }
+    }
+
+    function makeAOIBoxes(container, count) {
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('div');
+        el.className = 'dataposter-aoi';
+        const w = rnd(6, 16), h = rnd(5, 12);
+        el.style.left = rnd(2, 96 - w).toFixed(2) + '%';
+        el.style.top = rnd(2, 96 - h).toFixed(2) + '%';
+        el.style.width = w.toFixed(2) + '%';
+        el.style.height = h.toFixed(2) + '%';
+        container.appendChild(el);
+      }
+    }
+
+    function makeCrosses(container, count) {
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('span');
+        el.className = 'dataposter-cross';
+        el.style.left = rnd(4, 96).toFixed(2) + '%';
+        el.style.top = rnd(4, 96).toFixed(2) + '%';
+        container.appendChild(el);
+      }
+    }
+
+    function makeConnectors(container, count) {
+      const svgNS = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(svgNS, 'svg');
+      svg.setAttribute('class', 'dataposter-svg');
+      const W = container.clientWidth || 1000, H = container.clientHeight || 600;
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+      svg.setAttribute('preserveAspectRatio', 'none');
+
+      const defs = document.createElementNS(svgNS, 'defs');
+      const marker = document.createElementNS(svgNS, 'marker');
+      marker.setAttribute('id', 'dpArrow');
+      marker.setAttribute('viewBox', '0 0 10 10');
+      marker.setAttribute('refX', '8'); marker.setAttribute('refY', '5');
+      marker.setAttribute('markerWidth', '6'); marker.setAttribute('markerHeight', '6');
+      marker.setAttribute('orient', 'auto-start-reverse');
+      const arrowPath = document.createElementNS(svgNS, 'path');
+      arrowPath.setAttribute('d', 'M0,0 L10,5 L0,10 z');
+      arrowPath.setAttribute('fill', 'rgba(255,0,0,0.75)');
+      marker.appendChild(arrowPath);
+      defs.appendChild(marker);
+      svg.appendChild(defs);
+
+      for (let i = 0; i < count; i++) {
+        const x1 = rnd(0.1, 0.9) * W, y1 = rnd(0.1, 0.9) * H;
+        const x2 = rnd(0.1, 0.9) * W, y2 = rnd(0.1, 0.9) * H;
+        const line = document.createElementNS(svgNS, 'line');
+        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+        line.setAttribute('stroke', 'rgba(255,0,0,0.7)');
+        line.setAttribute('stroke-width', '1.4');
+        line.setAttribute('stroke-dasharray', '4 6');
+        line.setAttribute('marker-end', 'url(#dpArrow)');
+        svg.appendChild(line);
+      }
+      container.appendChild(svg);
+    }
+
+    function buildDataPoster(container) {
+      container.innerHTML = '';
+      makeConnectors(container, 5);
+      makeAOIBoxes(container, 4);
+      makeDots(container, 55);
+      makeRings(container, 6);
+      makeCrosses(container, 6);
+      makeCorners(container);
+      makeTinyLabels(container, 10);
+      makeStatLine(container, 6, `${Math.round(rnd(4,9))} MODES · ${rnd(10,60).toFixed(1)}S`);
+      makeStatLine(container, 92, `${Math.round(rnd(200,500))} SAMPLES · ${Math.round(rnd(30,90))} FPS`);
+    }
+
+    // ── וידאו הרקע (sky.mp4) — אותה התנהגות כמו בסצנה A ──
+    (function () {
+      const vid = document.getElementById('dataVideoBg');
+      if (!vid) return;
+      function slowDown() { vid.playbackRate = 0.6; }
+      slowDown();
+      vid.addEventListener('loadedmetadata', slowDown);
+      vid.addEventListener('play', slowDown);
+    })();
+
+    // חושף החוצה כדי שמנגנון החלפת הסצנות יבנה פיזור חדש בכל פעם
+    // שנכנסים לאחת הסצנות האלה (מיקומים אקראיים טריים, ומידות SVG
+    // נכונות כי רק אז לקונטיינר יש גודל אמיתי על המסך).
+    window.__sceneDataWhite_build = function () {
+      buildDataPoster(document.getElementById('dataWhiteLayer'));
+    };
+    window.__sceneDataVideo_build = function () {
+      buildDataPoster(document.getElementById('dataVideoLayer'));
+    };
+  })();
+
+  // ═══════════════════════════════════════════════════════════════
   // SCENE SWITCHING — לחיצה על רווח עוברת לאנימציה הבאה
   // ═══════════════════════════════════════════════════════════════
   (function () {
@@ -2507,7 +2765,9 @@
       document.getElementById('sceneSplash'),
       document.getElementById('sceneSession'),
       document.getElementById('sceneSpectrum'),
-      document.getElementById('sceneShowcase')
+      document.getElementById('sceneShowcase'),
+      document.getElementById('sceneDataWhite'),
+      document.getElementById('sceneDataVideo')
     ];
     var current = 0;
 
@@ -2523,6 +2783,8 @@
       if (scenes[current].id === 'sceneSession' && window.__sceneSession_resize) window.__sceneSession_resize();
       if (scenes[current].id === 'sceneSpectrum' && window.__sceneSpectrum_place) window.__sceneSpectrum_place();
       if (scenes[current].id === 'sceneShowcase' && window.__sceneShowcase_start) window.__sceneShowcase_start();
+      if (scenes[current].id === 'sceneDataWhite' && window.__sceneDataWhite_build) window.__sceneDataWhite_build();
+      if (scenes[current].id === 'sceneDataVideo' && window.__sceneDataVideo_build) window.__sceneDataVideo_build();
     });
   })();
 </script>
