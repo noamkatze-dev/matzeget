@@ -1141,8 +1141,11 @@
         ctx.beginPath(); ctx.arc(sx, sy, 1, 0, Math.PI*2); ctx.fill();
       }
       for (const r of aoiRegions) {
+        const sx=fit.oX+r.x*fit.dW, sy=fit.oY+r.y*fit.dH, sw=r.w*fit.dW, sh=r.h*fit.dH;
+        ctx.strokeStyle='rgba(255,0,0,0.75)'; ctx.lineWidth=1;
+        ctx.strokeRect(sx,sy,sw,sh);
         const cx=fit.oX+r.cx*fit.dW, cy=fit.oY+r.cy*fit.dH;
-        ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI*2);
+        ctx.beginPath(); ctx.arc(cx, cy, 1, 0, Math.PI*2);
         ctx.fillStyle='rgba(255,0,0,0.85)'; ctx.fill();
       }
     }
