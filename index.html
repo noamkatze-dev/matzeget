@@ -2811,8 +2811,8 @@
       }
     }
 
-    // ── 05 מפת חום (marching squares - זהה ל-Showcase) ──
-    const hmW = 60, hmH = 36, hm = new Float32Array(hmW * hmH);
+    // ── 05 מפת חום (marching squares, ברזולוציה גבוהה יותר לקווים חלקים יותר) ──
+    const hmW = 140, hmH = 84, hm = new Float32Array(hmW * hmH);
     const hmSigma = 0.10 * Math.max(hmW, hmH), hmR = Math.ceil(3 * hmSigma), hmInv2 = 1 / (2 * hmSigma * hmSigma);
     let hmPts = [], hmPtIdx = 0, hmTimerSet = false;
     function scheduleHeatStep(delay) {
@@ -2862,9 +2862,11 @@
       let maxVal = 0; for (let i = 0; i < hm.length; i++) if (hm[i] > maxVal) maxVal = hm[i];
       if (maxVal < 0.01) return;
       const M = 4, levels = [0.15, 0.30, 0.50, 0.70, 0.88];
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
       for (const level of levels) {
         ctx.strokeStyle = `rgba(255,0,0,${Math.min(1, 0.35 + level * 0.65).toFixed(2)})`;
-        ctx.lineWidth = 2.5; ctx.beginPath();
+        ctx.lineWidth = 2; ctx.beginPath();
         for (let cy2 = 0; cy2 < hmH - 1; cy2++) for (let cx2 = 0; cx2 < hmW - 1; cx2++) {
           const vTL = hm[cy2 * hmW + cx2] / maxVal, vTR = hm[cy2 * hmW + (cx2 + 1)] / maxVal;
           const vBR = hm[(cy2 + 1) * hmW + (cx2 + 1)] / maxVal, vBL = hm[(cy2 + 1) * hmW + cx2] / maxVal;
