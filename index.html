@@ -2594,14 +2594,17 @@
   })();
 
   // ═══════════════════════════════════════════════════════════════
-  // SCENE DATA WHITE — כל שיטות הניתוח (מבט/קיבוע/סקאדה/מסלול/
-  // מפת-חום/קיבוע-ראשון) על אותה נקודה בדיוק, כמה וריאציות של
-  // אותו מבט מוצגות יחד באותו מקום.
+  // SCENE DATA WHITE — כל שש שיטות הניתוח של סצנת Showcase (מבט,
+  // קיבוע, סקאדה, מסלול סריקה, מפת חום, קיבוע ראשון) בדיוק באותו
+  // סגנון ציור, כולן מוצגות יחד על אותו רקע לבן (באותם קואורדינטות
+  // מנורמלות שכבר בשימוש ב-Showcase - זו הסיבה שהן נופלות טבעית
+  // באותו אזור). קוד זה מועתק/מותאם בנפרד ואינו נוגע בסצנת Showcase.
   // ═══════════════════════════════════════════════════════════════
   (function () {
     'use strict';
 
     const RED = '#FF0000';
+    const FONT_FAMILY = 'HaimClassicBold';
     const canvas = document.getElementById('dataWhiteCanvas');
     const ctx = canvas.getContext('2d');
     let W = 0, H = 0, running = false;
@@ -2616,11 +2619,34 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
-    function maxR(duration) { return Math.min(10 + duration / 55, Math.min(W, H) * 0.16); }
+    // ── דוגמת הנתונים - זהה לזו שבסצנת Showcase ──
+    const gazeLog=[
+      {x:0.35,y:0.45},{x:0.34,y:0.46},{x:0.36,y:0.44},
+      {x:0.52,y:0.22},{x:0.51,y:0.23},{x:0.53,y:0.21},
+      {x:0.74,y:0.50},{x:0.73,y:0.51},{x:0.75,y:0.49},
+      {x:0.36,y:0.68},{x:0.35,y:0.69},{x:0.37,y:0.67},
+      {x:0.61,y:0.78},{x:0.60,y:0.79},{x:0.62,y:0.77},
+      {x:0.28,y:0.48},{x:0.50,y:0.50},{x:0.65,y:0.35}
+    ];
+    const fixHist=[
+      {x:0.35,y:0.45,duration:380},
+      {x:0.52,y:0.22,duration:260},
+      {x:0.74,y:0.50,duration:500},
+      {x:0.36,y:0.68,duration:180},
+      {x:0.61,y:0.78,duration:320}
+    ];
+    const sacHist=[
+      {fromX:0.35,fromY:0.45,toX:0.52,toY:0.22},
+      {fromX:0.52,fromY:0.22,toX:0.74,toY:0.50},
+      {fromX:0.74,fromY:0.50,toX:0.36,toY:0.68},
+      {fromX:0.36,fromY:0.68,toX:0.61,toY:0.78}
+    ];
+
+    function maxR(duration) { return Math.min(8 + duration / 60, Math.min(W, H) * 0.22); }
 
     function drawArrow(fx, fy, tx, ty) {
       ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(tx, ty); ctx.stroke();
-      const a = Math.atan2(ty - fy, tx - fx), l = 8;
+      const a = Math.atan2(ty - fy, tx - fx), l = 10;
       ctx.beginPath();
       ctx.moveTo(tx, ty);
       ctx.lineTo(tx - l * Math.cos(a - Math.PI / 6), ty - l * Math.sin(a - Math.PI / 6));
@@ -2628,139 +2654,249 @@
       ctx.closePath(); ctx.fillStyle = RED; ctx.fill();
     }
 
-    // ── 01 מבט — ענן נקודות עדין ממש סביב הנקודה, דועך ומתחדש ──
-    let gazeDots = [];
-    function stepGaze(cx, cy) {
-      gazeDots.forEach(d => d.age++);
-      gazeDots = gazeDots.filter(d => d.age < 90);
-      if (Math.random() < 0.5) {
-        gazeDots.push({ x: cx + (Math.random() - 0.5) * 5, y: cy + (Math.random() - 0.5) * 5, age: 0 });
+    // ── 01 מבט ──
+    let gDots = [], gIdx = 0, gT = 0;
+    function addGazeDot() {
+      const p = gazeLog[gIdx % gazeLog.length];
+      const jit = () => (Math.random() - 0.5) * 0.06;
+      gDots.push({ x: Math.max(0.05, Math.min(0.95, p.x + jit())), y: Math.max(0.05, Math.min(0.95, p.y + jit())), age: 0 });
+      if (gDots.length > 28) gDots.shift();
+      gIdx++;
+    }
+    function stepGaze() {
+      for (const d of gDots) {
+        d.age++;
+        const alpha = Math.max(0, 1 - d.age / 160);
+        ctx.beginPath(); ctx.arc(d.x * W, d.y * H, 3, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,0,0,${(alpha * 0.85).toFixed(2)})`; ctx.fill();
       }
-      for (const d of gazeDots) {
-        const alpha = Math.max(0, 1 - d.age / 90);
-        ctx.beginPath(); ctx.arc(d.x, d.y, 2.4, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255,0,0,${(alpha * 0.7).toFixed(2)})`; ctx.fill();
-      }
+      gT++; if (gT % 8 === 0) addGazeDot();
     }
 
-    // ── 02 קיבוע — עיגול גדל/דועך + תווית משך (מספר + "ms") ──
-    let fixPhase = 'grow', fixStart = null, fixDur = 300 + Math.random() * 300;
-    function stepFixation(cx, cy, ts) {
-      if (!fixStart) fixStart = ts;
-      const elapsed = ts - fixStart;
-      let prog;
-      if (fixPhase === 'grow') {
-        prog = Math.min(1, elapsed / 550);
-        if (prog >= 1) { fixPhase = 'wait'; fixStart = ts; }
-      } else if (fixPhase === 'wait') {
-        prog = 1;
-        if (elapsed > 700) { fixPhase = 'grow'; fixStart = ts; fixDur = 300 + Math.random() * 300; }
-      }
-      const r = maxR(fixDur) * prog;
-      ctx.beginPath(); ctx.arc(cx, cy, Math.max(1, r), 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255,0,0,${(0.13 * prog).toFixed(2)})`; ctx.fill();
-      ctx.beginPath(); ctx.arc(cx, cy, Math.max(1, r), 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255,0,0,${prog.toFixed(2)})`; ctx.lineWidth = 2; ctx.stroke();
-
-      if (prog > 0.3) {
-        const numStr = String(Math.round(fixDur));
-        const unitStr = 'ms';
-        const numFont = `700 10px HaimClassicBold`;
-        const unitFont = `700 10px HaimVariable`;
-        ctx.textBaseline = 'alphabetic';
-        ctx.font = numFont;
-        const numW = ctx.measureText(numStr).width;
-        ctx.font = unitFont;
-        const unitW = ctx.measureText(unitStr).width;
-        const totalW = numW + unitW;
-        const startX = cx - totalW / 2;
-        const y = cy + r + 14;
-        ctx.fillStyle = `rgba(255,0,0,${prog.toFixed(2)})`;
-        ctx.textAlign = 'left';
-        ctx.font = numFont;
-        ctx.fillText(numStr, startX, y);
-        ctx.font = unitFont;
-        ctx.fillText(unitStr, startX + numW, y);
+    // ── 02 קיבוע ──
+    let fIdx = 0, fShown = [], fStart = null, fPhase = 'grow';
+    function drawFixations() {
+      for (const fix of fShown) {
+        const cx = fix.x * W, cy = fix.y * H, r = maxR(fix.duration);
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,0,0,0.15)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.strokeStyle = RED; ctx.lineWidth = 2; ctx.stroke();
+        if (fix.duration > 0) {
+          const numStr = String(Math.round(fix.duration));
+          const unitStr = 'ms';
+          ctx.textBaseline = 'alphabetic';
+          ctx.font = `700 10px ${FONT_FAMILY}`;
+          const numW = ctx.measureText(numStr).width;
+          ctx.font = `700 10px HaimVariable`;
+          const unitW = ctx.measureText(unitStr).width;
+          const startX = cx - (numW + unitW) / 2, y = cy + r + 13;
+          ctx.fillStyle = RED;
+          ctx.textAlign = 'left';
+          ctx.font = `700 10px ${FONT_FAMILY}`;
+          ctx.fillText(numStr, startX, y);
+          ctx.font = `700 10px HaimVariable`;
+          ctx.fillText(unitStr, startX + numW, y);
+        }
       }
     }
-
-    // ── 03 סקאדה — קפיצה קצרה החוצה מהנקודה וחזרה, כחץ מהבהב ──
-    let sacPhase = 'out', sacStart = null, sacAngle = Math.random() * Math.PI * 2;
-    function stepSaccade(cx, cy, ts) {
-      if (!sacStart) sacStart = ts;
-      const elapsed = ts - sacStart;
-      const amp = Math.min(W, H) * 0.05;
-      const tx = cx + Math.cos(sacAngle) * amp, ty = cy + Math.sin(sacAngle) * amp;
-      if (sacPhase === 'out') {
-        const prog = Math.min(1, elapsed / 220);
-        ctx.strokeStyle = RED; ctx.lineWidth = 1.5;
-        drawArrow(cx, cy, cx + (tx - cx) * prog, cy + (ty - cy) * prog);
-        if (prog >= 1) { sacPhase = 'wait'; sacStart = ts; }
-      } else if (sacPhase === 'wait') {
-        ctx.strokeStyle = RED; ctx.lineWidth = 1.5;
-        drawArrow(cx, cy, tx, ty);
-        if (elapsed > 260) { sacPhase = 'back'; sacStart = ts; }
+    function stepFixation(ts) {
+      if (!fStart) fStart = ts;
+      const elapsed = ts - fStart;
+      if (fPhase === 'grow') {
+        const fix = fixHist[fIdx], dur = 550, prog = Math.min(1, elapsed / dur);
+        const cx = fix.x * W, cy = fix.y * H, r = maxR(fix.duration) * prog;
+        drawFixations();
+        ctx.beginPath(); ctx.arc(cx, cy, Math.max(1, r), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,0,0,${(0.15 * prog).toFixed(2)})`; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, Math.max(1, r), 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255,0,0,${prog.toFixed(2)})`; ctx.lineWidth = 2; ctx.stroke();
+        if (prog >= 1) { fShown.push(fix); fIdx = (fIdx + 1) % fixHist.length; fPhase = 'wait'; fStart = ts; }
       } else {
-        const prog = Math.min(1, elapsed / 220);
-        ctx.strokeStyle = `rgba(255,0,0,${(1 - prog).toFixed(2)})`; ctx.lineWidth = 1.5;
-        drawArrow(tx, ty, tx + (cx - tx) * prog, ty + (cy - ty) * prog);
-        if (prog >= 1) { sacPhase = 'out'; sacStart = ts; sacAngle = Math.random() * Math.PI * 2; }
+        drawFixations();
+        if (elapsed > 700) { if (fIdx === 0) fShown = []; fPhase = 'grow'; fStart = ts; }
       }
     }
 
-    // ── 04 מסלול סריקה — צומת יחיד פועם על הנקודה (מסלול בן-נקודה-אחת) ──
-    function stepScanPath(cx, cy, ts) {
-      const NODE_R = 11;
-      const pulse = 1 + Math.sin(ts / 500) * 0.08;
-      ctx.beginPath(); ctx.arc(cx, cy, NODE_R * pulse, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,0,0,0.12)'; ctx.fill();
-      ctx.beginPath(); ctx.arc(cx, cy, NODE_R * pulse, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255,0,0,0.9)'; ctx.lineWidth = 1.5;
-      ctx.setLineDash([3, 4]); ctx.stroke(); ctx.setLineDash([]);
+    // ── 03 סקאדה ──
+    let sIdx = 0, sDrawn = [], sStart = null, sPhase = 'draw';
+    function drawOneSaccade(sc, full) {
+      ctx.strokeStyle = RED; ctx.lineWidth = 2;
+      const fx = sc.fromX * W, fy = sc.fromY * H, tx = sc.toX * W, ty = sc.toY * H;
+      if (full) drawArrow(fx, fy, tx, ty);
+      else { ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(tx, ty); ctx.stroke(); }
+    }
+    function drawSaccades() { for (const sc of sDrawn) drawOneSaccade(sc, true); }
+    function stepSaccade(ts) {
+      if (!sStart) sStart = ts;
+      const elapsed = ts - sStart;
+      if (sPhase === 'draw') {
+        const sc = sacHist[sIdx], dur = 350, prog = Math.min(1, elapsed / dur);
+        const fx = sc.fromX * W, fy = sc.fromY * H, tx = sc.toX * W, ty = sc.toY * H;
+        const ex = fx + (tx - fx) * prog, ey = fy + (ty - fy) * prog;
+        drawSaccades();
+        ctx.strokeStyle = RED; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(ex, ey); ctx.stroke();
+        if (prog >= 1) { sDrawn.push(sc); sIdx = (sIdx + 1) % sacHist.length; sPhase = 'wait'; sStart = ts; }
+      } else {
+        drawSaccades();
+        if (elapsed > 800) { if (sIdx === 0) sDrawn = []; sPhase = 'draw'; sStart = ts; }
+      }
     }
 
-    // ── 05 מפת חום — כתם מטושטש שפועם סביב אותה נקודה ──
-    function stepHeatmap(cx, cy, ts) {
-      const pulse = 0.85 + Math.sin(ts / 900) * 0.2;
-      const radius = Math.min(W, H) * 0.13 * pulse;
-      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-      grad.addColorStop(0, 'rgba(255,0,0,0.45)');
-      grad.addColorStop(0.5, 'rgba(255,0,0,0.20)');
-      grad.addColorStop(1, 'rgba(255,0,0,0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
+    // ── 04 מסלול סריקה ──
+    let spN = 0, spStart = null, spPhase = 'add';
+    function drawScanPath(count) {
+      const NODE_R = 14;
+      if (count >= 2) {
+        ctx.save(); ctx.setLineDash([4, 7]);
+        ctx.strokeStyle = RED; ctx.lineWidth = 2;
+        for (let j = 0; j < count - 1; j++) {
+          const a = fixHist[j], b = fixHist[j + 1];
+          const ax = a.x * W, ay = a.y * H, bx = b.x * W, by = b.y * H;
+          const dx = bx - ax, dy = by - ay, dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 1) continue;
+          const ux = dx / dist, uy = dy / dist;
+          ctx.beginPath(); ctx.moveTo(ax + ux * NODE_R, ay + uy * NODE_R);
+          ctx.lineTo(bx - ux * NODE_R, by - uy * NODE_R); ctx.stroke();
+        }
+        ctx.setLineDash([]); ctx.restore();
+      }
+      for (let j = 0; j < count; j++) {
+        const p = fixHist[j], cx = p.x * W, cy = p.y * H;
+        ctx.beginPath(); ctx.arc(cx, cy, NODE_R, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,0,0,0.15)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, NODE_R, 0, Math.PI * 2);
+        ctx.strokeStyle = RED; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = RED; ctx.font = `700 11px ${FONT_FAMILY}`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(j + 1, cx, cy);
+      }
+    }
+    function stepScanPath(ts) {
+      if (!spStart) spStart = ts;
+      const elapsed = ts - spStart;
+      if (spPhase === 'add') {
+        if (elapsed > 700) { spN++; drawScanPath(spN); if (spN >= fixHist.length) spPhase = 'pause'; spStart = ts; }
+        else drawScanPath(spN);
+      } else {
+        drawScanPath(spN);
+        if (elapsed > 1400) { spN = 0; spPhase = 'add'; spStart = ts; }
+      }
     }
 
-    // ── 06 קיבוע ראשון — הבזק טבעת + תווית "First fixation" ──
-    let ffStart = null;
-    function stepFirstFix(cx, cy, ts) {
+    // ── 05 מפת חום (marching squares - זהה ל-Showcase) ──
+    const hmW = 60, hmH = 36, hm = new Float32Array(hmW * hmH);
+    const hmSigma = 0.10 * Math.max(hmW, hmH), hmR = Math.ceil(3 * hmSigma), hmInv2 = 1 / (2 * hmSigma * hmSigma);
+    let hmPts = [], hmPtIdx = 0, hmTimerSet = false;
+    function scheduleHeatStep(delay) {
+      hmTimerSet = true;
+      setTimeout(() => {
+        if (!running) { hmTimerSet = false; return; }
+        for (let b = 0; b < 3 && hmPtIdx < hmPts.length; b++, hmPtIdx++) addHeatPoint(hmPts[hmPtIdx]);
+        if (hmPtIdx < hmPts.length) {
+          scheduleHeatStep(120);
+        } else {
+          setTimeout(() => {
+            if (!running) { hmTimerSet = false; return; }
+            for (let i = 0; i < hm.length; i++) hm[i] = 0;
+            hmPtIdx = 0;
+            scheduleHeatStep(0);
+          }, 2500);
+        }
+      }, delay);
+    }
+    function buildHeatPts() {
+      hmPts = [];
+      for (let rep = 0; rep < 3; rep++) {
+        for (const p of gazeLog) {
+          const jx = (Math.random() - 0.5) * 0.08, jy = (Math.random() - 0.5) * 0.08;
+          hmPts.push({ x: Math.max(0.05, Math.min(0.95, p.x + jx)), y: Math.max(0.05, Math.min(0.95, p.y + jy)) });
+        }
+      }
+      hmPtIdx = 0;
+    }
+    function addHeatPoint(p) {
+      const gx = p.x * hmW, gy = p.y * hmH;
+      const x0 = Math.max(0, Math.floor(gx - hmR)), x1 = Math.min(hmW - 1, Math.ceil(gx + hmR));
+      const y0 = Math.max(0, Math.floor(gy - hmR)), y1 = Math.min(hmH - 1, Math.ceil(gy + hmR));
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++)
+        hm[y * hmW + x] += 0.22 * Math.exp(-((x - gx) ** 2 + (y - gy) ** 2) * hmInv2);
+    }
+    function getMSSegs(idx, T, R, B, L) {
+      switch (idx) {
+        case 1: return [[L, B]]; case 2: return [[R, B]]; case 3: return [[L, R]];
+        case 4: return [[T, R]]; case 5: return [[T, R], [L, B]]; case 6: return [[T, B]];
+        case 7: return [[T, L]]; case 8: return [[T, L]]; case 9: return [[T, B]];
+        case 10: return [[L, T], [R, B]]; case 11: return [[T, R]]; case 12: return [[L, R]];
+        case 13: return [[R, B]]; case 14: return [[L, B]]; default: return [];
+      }
+    }
+    function renderHeatmap() {
+      let maxVal = 0; for (let i = 0; i < hm.length; i++) if (hm[i] > maxVal) maxVal = hm[i];
+      if (maxVal < 0.01) return;
+      const M = 4, levels = [0.15, 0.30, 0.50, 0.70, 0.88];
+      for (const level of levels) {
+        ctx.strokeStyle = `rgba(255,0,0,${Math.min(1, 0.35 + level * 0.65).toFixed(2)})`;
+        ctx.lineWidth = 2.5; ctx.beginPath();
+        for (let cy2 = 0; cy2 < hmH - 1; cy2++) for (let cx2 = 0; cx2 < hmW - 1; cx2++) {
+          const vTL = hm[cy2 * hmW + cx2] / maxVal, vTR = hm[cy2 * hmW + (cx2 + 1)] / maxVal;
+          const vBR = hm[(cy2 + 1) * hmW + (cx2 + 1)] / maxVal, vBL = hm[(cy2 + 1) * hmW + cx2] / maxVal;
+          const idx2 = (vTL >= level ? 8 : 0) + (vTR >= level ? 4 : 0) + (vBR >= level ? 2 : 0) + (vBL >= level ? 1 : 0);
+          if (idx2 === 0 || idx2 === 15) continue;
+          const sx0 = M + cx2 * (W - 2 * M) / hmW, sx1 = M + (cx2 + 1) * (W - 2 * M) / hmW;
+          const sy0 = M + cy2 * (H - 2 * M) / hmH, sy1 = M + (cy2 + 1) * (H - 2 * M) / hmH;
+          const lp = (v0, v1) => Math.abs(v1 - v0) < 1e-10 ? 0.5 : Math.max(0, Math.min(1, (level - v0) / (v1 - v0)));
+          const T2 = [sx0 + lp(vTL, vTR) * (sx1 - sx0), sy0], R2 = [sx1, sy0 + lp(vTR, vBR) * (sy1 - sy0)];
+          const B2 = [sx0 + lp(vBL, vBR) * (sx1 - sx0), sy1], L2 = [sx0, sy0 + lp(vTL, vBL) * (sy1 - sy0)];
+          for (const [p1, p2] of getMSSegs(idx2, T2, R2, B2, L2)) {
+            ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]);
+          }
+        }
+        ctx.stroke();
+      }
+    }
+    function stepHeatmap() {
+      renderHeatmap();
+    }
+
+    // ── 06 קיבוע ראשון ──
+    const ffFix = { x: fixHist[0].x, y: fixHist[0].y };
+    let ffPhase = 'flash', ffStart = null;
+    function stepFirstFix(ts) {
       if (!ffStart) ffStart = ts;
-      const cycle = 2200, elapsed = (ts - ffStart) % cycle;
-      if (elapsed < 700) {
-        const prog = elapsed / 700;
-        ctx.beginPath(); ctx.arc(cx, cy, 8 + prog * 30, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(255,0,0,${((1 - prog) * 0.7).toFixed(2)})`; ctx.lineWidth = 2; ctx.stroke();
+      const elapsed = ts - ffStart;
+      const cx = ffFix.x * W, cy = ffFix.y * H;
+      if (ffPhase === 'flash') {
+        const prog = Math.min(1, elapsed / 700);
+        ctx.beginPath(); ctx.arc(cx, cy, 8 + prog * 34, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255,0,0,${((1 - prog) * 0.85).toFixed(2)})`; ctx.lineWidth = 2; ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, cy, Math.max(2, 14 * prog), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,0,0,${prog.toFixed(2)})`; ctx.fill();
+        if (prog >= 1) { ffPhase = 'pulse'; ffStart = ts; }
       } else {
-        const pt = ((elapsed - 700) % 1400) / 1400, pr = 12 + Math.sin(pt * Math.PI * 2) * 4;
+        const pt = (elapsed % 1400) / 1400, pr = 14 + Math.sin(pt * Math.PI * 2) * 5;
         ctx.beginPath(); ctx.arc(cx, cy, pr, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(255,0,0,0.4)'; ctx.lineWidth = 1.2; ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,0,0,0.45)'; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+        ctx.fillStyle = RED; ctx.fill();
+        ctx.fillStyle = RED; ctx.font = `700 10px HaimVariable`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+        ctx.fillText('First fixation', cx, cy - 34);
+        if (elapsed > 2200) { ffPhase = 'flash'; ffStart = ts; }
       }
-      ctx.fillStyle = RED; ctx.font = `700 10px HaimVariable`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-      ctx.fillText('First fixation', cx, cy - 40);
     }
 
     function draw(ts) {
       if (!running) return;
       ctx.clearRect(0, 0, W, H);
-      const cx = W / 2, cy = H / 2;
 
-      stepHeatmap(cx, cy, ts);
-      stepScanPath(cx, cy, ts);
-      stepGaze(cx, cy);
-      stepSaccade(cx, cy, ts);
-      stepFixation(cx, cy, ts);
-      stepFirstFix(cx, cy, ts);
+      stepHeatmap();
+      stepScanPath(ts);
+      stepGaze();
+      stepSaccade(ts);
+      stepFixation(ts);
+      stepFirstFix(ts);
 
       requestAnimationFrame(draw);
     }
@@ -2769,10 +2905,14 @@
     // נהיית גלויה בפועל (ולא כשהיא עדיין מוסתרת עם גודל אפס).
     window.__sceneDataWhite_build = function () {
       resizeCanvas();
-      gazeDots = [];
-      fixPhase = 'grow'; fixStart = null;
-      sacPhase = 'out'; sacStart = null;
-      ffStart = null;
+      gDots = []; gIdx = 0; gT = 0;
+      fIdx = 0; fShown = []; fStart = null; fPhase = 'grow';
+      sIdx = 0; sDrawn = []; sStart = null; sPhase = 'draw';
+      spN = 0; spStart = null; spPhase = 'add';
+      for (let i = 0; i < hm.length; i++) hm[i] = 0;
+      buildHeatPts();
+      if (!hmTimerSet) scheduleHeatStep(200);
+      ffPhase = 'flash'; ffStart = null;
       if (!running) { running = true; requestAnimationFrame(draw); }
     };
 
