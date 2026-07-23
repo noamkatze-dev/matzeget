@@ -2887,9 +2887,16 @@
       }
     }
 
+    const COMPOSITE_SCALE = 0.6; // גורם הקטנה של כל ההרכבה סביב מרכז המסך
+
     function draw(ts) {
       if (!running) return;
       ctx.clearRect(0, 0, W, H);
+
+      ctx.save();
+      ctx.translate(W / 2, H / 2);
+      ctx.scale(COMPOSITE_SCALE, COMPOSITE_SCALE);
+      ctx.translate(-W / 2, -H / 2);
 
       stepHeatmap();
       stepScanPath(ts);
@@ -2897,6 +2904,8 @@
       stepSaccade(ts);
       stepFixation(ts);
       stepFirstFix(ts);
+
+      ctx.restore();
 
       requestAnimationFrame(draw);
     }
