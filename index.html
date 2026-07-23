@@ -514,6 +514,14 @@
     overflow: hidden;
   }
 
+  #dataWhiteCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
   .dataposter-layer {
     position: absolute;
     inset: 0;
@@ -696,7 +704,7 @@
 <!-- SCENE DATA WHITE -->
 <div id="sceneDataWhite" class="scene">
   <div class="dataposter-stage">
-    <div id="dataWhiteLayer" class="dataposter-layer"></div>
+    <canvas id="dataWhiteCanvas"></canvas>
   </div>
 </div>
 
@@ -2586,188 +2594,189 @@
   })();
 
   // ═══════════════════════════════════════════════════════════════
-  // SCENE DATA WHITE / DATA VIDEO — כל הנתונים הויזואליים מפוזרים
+  // SCENE DATA WHITE — כל שיטות הניתוח (מבט/קיבוע/סקאדה/מסלול/
+  // מפת-חום/קיבוע-ראשון) על אותה נקודה בדיוק, כמה וריאציות של
+  // אותו מבט מוצגות יחד באותו מקום.
   // ═══════════════════════════════════════════════════════════════
   (function () {
     'use strict';
 
-    const LABELS = ['GAZE','FIXATION','SACCADE','SCANPATH','HEATMAP','AOI','EDGE','MOTION','CONTRAST','STAB','SHARP','DETAIL','VERTICAL','HORIZONTAL','DIAGONAL','CORNER'];
+    const RED = '#FF0000';
+    const canvas = document.getElementById('dataWhiteCanvas');
+    const ctx = canvas.getContext('2d');
+    let W = 0, H = 0, running = false;
 
-    function rnd(min, max) { return min + Math.random() * (max - min); }
-    function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const wrap = canvas.parentElement;
+      W = wrap.clientWidth || 800;
+      H = wrap.clientHeight || 600;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
 
-    function makeDots(container, count) {
-      const frag = document.createDocumentFragment();
-      for (let i = 0; i < count; i++) {
-        const dot = document.createElement('span');
-        dot.className = 'dot';
-        dot.style.setProperty('--x', rnd(2, 98).toFixed(2) + '%');
-        dot.style.setProperty('--y', rnd(2, 98).toFixed(2) + '%');
-        dot.style.setProperty('--delay', rnd(0, 5).toFixed(2) + 's');
-        dot.style.setProperty('--dur', rnd(2.5, 5.5).toFixed(2) + 's');
-        frag.appendChild(dot);
+    function maxR(duration) { return Math.min(10 + duration / 55, Math.min(W, H) * 0.16); }
+
+    function drawArrow(fx, fy, tx, ty) {
+      ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(tx, ty); ctx.stroke();
+      const a = Math.atan2(ty - fy, tx - fx), l = 8;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(tx - l * Math.cos(a - Math.PI / 6), ty - l * Math.sin(a - Math.PI / 6));
+      ctx.lineTo(tx - l * Math.cos(a + Math.PI / 6), ty - l * Math.sin(a + Math.PI / 6));
+      ctx.closePath(); ctx.fillStyle = RED; ctx.fill();
+    }
+
+    // ── 01 מבט — ענן נקודות עדין ממש סביב הנקודה, דועך ומתחדש ──
+    let gazeDots = [];
+    function stepGaze(cx, cy) {
+      gazeDots.forEach(d => d.age++);
+      gazeDots = gazeDots.filter(d => d.age < 90);
+      if (Math.random() < 0.5) {
+        gazeDots.push({ x: cx + (Math.random() - 0.5) * 5, y: cy + (Math.random() - 0.5) * 5, age: 0 });
       }
-      container.appendChild(frag);
-    }
-
-    function makeCorners(container) {
-      ['tl','tr','bl','br'].forEach(pos => {
-        const el = document.createElement('span');
-        el.className = 'splash-corner ' + pos;
-        container.appendChild(el);
-      });
-    }
-
-    function localCountUp(el, target, duration) {
-      (async function loop() {
-        while (true) {
-          await animateVal(el, 0, target, duration);
-          await new Promise(r => setTimeout(r, 200));
-          await animateVal(el, target, 0, duration);
-          await new Promise(r => setTimeout(r, 200));
-        }
-      })();
-    }
-
-    function animateVal(el, from, to, duration) {
-      const start = performance.now();
-      return new Promise(resolve => {
-        function step(now) {
-          const t = Math.min(1, (now - start) / duration);
-          const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-          const val = from + (to - from) * eased;
-          el.textContent = val.toFixed(2).padStart(5, '0');
-          if (t < 1 && el.isConnected) requestAnimationFrame(step);
-          else if (el.isConnected) { el.textContent = to.toFixed(2).padStart(5, '0'); resolve(); }
-          else resolve();
-        }
-        requestAnimationFrame(step);
-      });
-    }
-
-    function makeStatLine(container, topPct, label) {
-      const line = document.createElement('div');
-      line.className = 'splash-statline';
-      line.style.position = 'absolute';
-      line.style.top = topPct + '%';
-      line.style.left = '8%';
-      line.style.right = '8%';
-      line.style.width = 'auto';
-      line.innerHTML = `<span class="num">00.00</span><span class="line"></span><span class="label">${label}</span><span class="line"></span><span class="num">00.00</span>`;
-      container.appendChild(line);
-      const nums = line.querySelectorAll('.num');
-      localCountUp(nums[0], rnd(20, 99), rnd(1400, 2200));
-      localCountUp(nums[1], rnd(20, 99), rnd(1400, 2200));
-    }
-
-    function makeTinyLabels(container, count) {
-      for (let i = 0; i < count; i++) {
-        const el = document.createElement('span');
-        el.className = 'splash-tiny dataposter-label' + (Math.random() < 0.4 ? ' thin' : '');
-        el.textContent = pick(LABELS) + ' / ' + Math.round(rnd(0, 99));
-        el.style.position = 'absolute';
-        el.style.left = rnd(4, 80).toFixed(2) + '%';
-        el.style.top = rnd(4, 94).toFixed(2) + '%';
-        el.style.animationDelay = rnd(0, 2.4).toFixed(2) + 's';
-        el.style.animationDuration = rnd(1.8, 3.2).toFixed(2) + 's';
-        container.appendChild(el);
+      for (const d of gazeDots) {
+        const alpha = Math.max(0, 1 - d.age / 90);
+        ctx.beginPath(); ctx.arc(d.x, d.y, 2.4, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,0,0,${(alpha * 0.7).toFixed(2)})`; ctx.fill();
       }
     }
 
-    function makeRings(container, count) {
-      for (let i = 0; i < count; i++) {
-        const el = document.createElement('span');
-        el.className = 'dataposter-ring';
-        el.style.left = rnd(6, 94).toFixed(2) + '%';
-        el.style.top = rnd(6, 94).toFixed(2) + '%';
-        el.style.animationDelay = rnd(0, 1.6).toFixed(2) + 's';
-        el.style.animationDuration = rnd(1.2, 2.2).toFixed(2) + 's';
-        container.appendChild(el);
+    // ── 02 קיבוע — עיגול גדל/דועך + תווית משך (מספר + "ms") ──
+    let fixPhase = 'grow', fixStart = null, fixDur = 300 + Math.random() * 300;
+    function stepFixation(cx, cy, ts) {
+      if (!fixStart) fixStart = ts;
+      const elapsed = ts - fixStart;
+      let prog;
+      if (fixPhase === 'grow') {
+        prog = Math.min(1, elapsed / 550);
+        if (prog >= 1) { fixPhase = 'wait'; fixStart = ts; }
+      } else if (fixPhase === 'wait') {
+        prog = 1;
+        if (elapsed > 700) { fixPhase = 'grow'; fixStart = ts; fixDur = 300 + Math.random() * 300; }
+      }
+      const r = maxR(fixDur) * prog;
+      ctx.beginPath(); ctx.arc(cx, cy, Math.max(1, r), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,0,0,${(0.13 * prog).toFixed(2)})`; ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, Math.max(1, r), 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,0,0,${prog.toFixed(2)})`; ctx.lineWidth = 2; ctx.stroke();
+
+      if (prog > 0.3) {
+        const numStr = String(Math.round(fixDur));
+        const unitStr = 'ms';
+        const numFont = `700 10px HaimClassicBold`;
+        const unitFont = `700 10px HaimVariable`;
+        ctx.textBaseline = 'alphabetic';
+        ctx.font = numFont;
+        const numW = ctx.measureText(numStr).width;
+        ctx.font = unitFont;
+        const unitW = ctx.measureText(unitStr).width;
+        const totalW = numW + unitW;
+        const startX = cx - totalW / 2;
+        const y = cy + r + 14;
+        ctx.fillStyle = `rgba(255,0,0,${prog.toFixed(2)})`;
+        ctx.textAlign = 'left';
+        ctx.font = numFont;
+        ctx.fillText(numStr, startX, y);
+        ctx.font = unitFont;
+        ctx.fillText(unitStr, startX + numW, y);
       }
     }
 
-    function makeAOIBoxes(container, count) {
-      for (let i = 0; i < count; i++) {
-        const el = document.createElement('div');
-        el.className = 'dataposter-aoi';
-        const w = rnd(6, 16), h = rnd(5, 12);
-        el.style.left = rnd(2, 96 - w).toFixed(2) + '%';
-        el.style.top = rnd(2, 96 - h).toFixed(2) + '%';
-        el.style.width = w.toFixed(2) + '%';
-        el.style.height = h.toFixed(2) + '%';
-        el.style.animationDelay = rnd(0, 2.8).toFixed(2) + 's';
-        el.style.animationDuration = rnd(2.2, 3.6).toFixed(2) + 's';
-        container.appendChild(el);
+    // ── 03 סקאדה — קפיצה קצרה החוצה מהנקודה וחזרה, כחץ מהבהב ──
+    let sacPhase = 'out', sacStart = null, sacAngle = Math.random() * Math.PI * 2;
+    function stepSaccade(cx, cy, ts) {
+      if (!sacStart) sacStart = ts;
+      const elapsed = ts - sacStart;
+      const amp = Math.min(W, H) * 0.05;
+      const tx = cx + Math.cos(sacAngle) * amp, ty = cy + Math.sin(sacAngle) * amp;
+      if (sacPhase === 'out') {
+        const prog = Math.min(1, elapsed / 220);
+        ctx.strokeStyle = RED; ctx.lineWidth = 1.5;
+        drawArrow(cx, cy, cx + (tx - cx) * prog, cy + (ty - cy) * prog);
+        if (prog >= 1) { sacPhase = 'wait'; sacStart = ts; }
+      } else if (sacPhase === 'wait') {
+        ctx.strokeStyle = RED; ctx.lineWidth = 1.5;
+        drawArrow(cx, cy, tx, ty);
+        if (elapsed > 260) { sacPhase = 'back'; sacStart = ts; }
+      } else {
+        const prog = Math.min(1, elapsed / 220);
+        ctx.strokeStyle = `rgba(255,0,0,${(1 - prog).toFixed(2)})`; ctx.lineWidth = 1.5;
+        drawArrow(tx, ty, tx + (cx - tx) * prog, ty + (cy - ty) * prog);
+        if (prog >= 1) { sacPhase = 'out'; sacStart = ts; sacAngle = Math.random() * Math.PI * 2; }
       }
     }
 
-    function makeCrosses(container, count) {
-      for (let i = 0; i < count; i++) {
-        const el = document.createElement('span');
-        el.className = 'dataposter-cross';
-        el.style.left = rnd(4, 96).toFixed(2) + '%';
-        el.style.top = rnd(4, 96).toFixed(2) + '%';
-        el.style.animationDelay = rnd(0, 1.8).toFixed(2) + 's';
-        el.style.animationDuration = rnd(1.4, 2.4).toFixed(2) + 's';
-        container.appendChild(el);
+    // ── 04 מסלול סריקה — צומת יחיד פועם על הנקודה (מסלול בן-נקודה-אחת) ──
+    function stepScanPath(cx, cy, ts) {
+      const NODE_R = 11;
+      const pulse = 1 + Math.sin(ts / 500) * 0.08;
+      ctx.beginPath(); ctx.arc(cx, cy, NODE_R * pulse, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,0,0,0.12)'; ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, NODE_R * pulse, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,0,0,0.9)'; ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 4]); ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    // ── 05 מפת חום — כתם מטושטש שפועם סביב אותה נקודה ──
+    function stepHeatmap(cx, cy, ts) {
+      const pulse = 0.85 + Math.sin(ts / 900) * 0.2;
+      const radius = Math.min(W, H) * 0.13 * pulse;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      grad.addColorStop(0, 'rgba(255,0,0,0.45)');
+      grad.addColorStop(0.5, 'rgba(255,0,0,0.20)');
+      grad.addColorStop(1, 'rgba(255,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // ── 06 קיבוע ראשון — הבזק טבעת + תווית "First fixation" ──
+    let ffStart = null;
+    function stepFirstFix(cx, cy, ts) {
+      if (!ffStart) ffStart = ts;
+      const cycle = 2200, elapsed = (ts - ffStart) % cycle;
+      if (elapsed < 700) {
+        const prog = elapsed / 700;
+        ctx.beginPath(); ctx.arc(cx, cy, 8 + prog * 30, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255,0,0,${((1 - prog) * 0.7).toFixed(2)})`; ctx.lineWidth = 2; ctx.stroke();
+      } else {
+        const pt = ((elapsed - 700) % 1400) / 1400, pr = 12 + Math.sin(pt * Math.PI * 2) * 4;
+        ctx.beginPath(); ctx.arc(cx, cy, pr, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,0,0,0.4)'; ctx.lineWidth = 1.2; ctx.stroke();
       }
+      ctx.fillStyle = RED; ctx.font = `700 10px HaimVariable`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText('First fixation', cx, cy - 40);
     }
 
-    function makeConnectors(container, count) {
-      const svgNS = 'http://www.w3.org/2000/svg';
-      const svg = document.createElementNS(svgNS, 'svg');
-      svg.setAttribute('class', 'dataposter-svg');
-      const W = container.clientWidth || 1000, H = container.clientHeight || 600;
-      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-      svg.setAttribute('preserveAspectRatio', 'none');
+    function draw(ts) {
+      if (!running) return;
+      ctx.clearRect(0, 0, W, H);
+      const cx = W / 2, cy = H / 2;
 
-      const defs = document.createElementNS(svgNS, 'defs');
-      const marker = document.createElementNS(svgNS, 'marker');
-      marker.setAttribute('id', 'dpArrow');
-      marker.setAttribute('viewBox', '0 0 10 10');
-      marker.setAttribute('refX', '8'); marker.setAttribute('refY', '5');
-      marker.setAttribute('markerWidth', '6'); marker.setAttribute('markerHeight', '6');
-      marker.setAttribute('orient', 'auto-start-reverse');
-      const arrowPath = document.createElementNS(svgNS, 'path');
-      arrowPath.setAttribute('d', 'M0,0 L10,5 L0,10 z');
-      arrowPath.setAttribute('fill', 'rgba(255,0,0,0.75)');
-      marker.appendChild(arrowPath);
-      defs.appendChild(marker);
-      svg.appendChild(defs);
+      stepHeatmap(cx, cy, ts);
+      stepScanPath(cx, cy, ts);
+      stepGaze(cx, cy);
+      stepSaccade(cx, cy, ts);
+      stepFixation(cx, cy, ts);
+      stepFirstFix(cx, cy, ts);
 
-      for (let i = 0; i < count; i++) {
-        const x1 = rnd(0.1, 0.9) * W, y1 = rnd(0.1, 0.9) * H;
-        const x2 = rnd(0.1, 0.9) * W, y2 = rnd(0.1, 0.9) * H;
-        const line = document.createElementNS(svgNS, 'line');
-        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
-        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
-        line.setAttribute('stroke', 'rgba(255,0,0,0.7)');
-        line.setAttribute('stroke-width', '1.4');
-        line.setAttribute('stroke-dasharray', '4 6');
-        line.setAttribute('marker-end', 'url(#dpArrow)');
-        line.setAttribute('class', 'dataposter-line');
-        line.style.animationDelay = rnd(0, 1.1).toFixed(2) + 's';
-        line.style.animationDuration = rnd(0.8, 1.6).toFixed(2) + 's';
-        svg.appendChild(line);
-      }
-      container.appendChild(svg);
+      requestAnimationFrame(draw);
     }
 
-    function buildDataPoster(container) {
-      container.innerHTML = '';
-      makeConnectors(container, 5);
-      makeAOIBoxes(container, 4);
-      makeDots(container, 55);
-      makeRings(container, 6);
-      makeCrosses(container, 6);
-    }
-
-    // חושף החוצה כדי שמנגנון החלפת הסצנות יבנה פיזור חדש בכל פעם
-    // שנכנסים לסצנה הזו (מיקומים אקראיים טריים, ומידות SVG נכונות
-    // כי רק אז לקונטיינר יש גודל אמיתי על המסך).
+    // חושף החוצה כדי שהקנבס יימדד וירוץ מחדש בדיוק ברגע שהסצנה
+    // נהיית גלויה בפועל (ולא כשהיא עדיין מוסתרת עם גודל אפס).
     window.__sceneDataWhite_build = function () {
-      buildDataPoster(document.getElementById('dataWhiteLayer'));
+      resizeCanvas();
+      gazeDots = [];
+      fixPhase = 'grow'; fixStart = null;
+      sacPhase = 'out'; sacStart = null;
+      ffStart = null;
+      if (!running) { running = true; requestAnimationFrame(draw); }
     };
+
+    window.addEventListener('resize', () => { if (running) resizeCanvas(); });
   })();
 
   // ═══════════════════════════════════════════════════════════════
