@@ -2887,22 +2887,18 @@
       }
     }
 
-    const COMPOSITE_SCALE = 0.6; // גורם הקטנה של שאר הסימונים (לא של מפת החום) סביב מרכז המסך
+    const COMPOSITE_SCALE = 0.6; // גורם הקטנה של כל ההרכבה סביב מרכז המסך
 
     function draw(ts) {
       if (!running) return;
       ctx.clearRect(0, 0, W, H);
-
-      // מפת החום נשארת תמיד ממלאת את כל הקנבס (בלי כיווץ), כי היא
-      // כבר מחושבת עם שוליים זעירים משלה - כיווצה יחד עם השאר הוא
-      // מה שיצר את השוליים הריקים הגדולים סביבה.
-      stepHeatmap();
 
       ctx.save();
       ctx.translate(W / 2, H / 2);
       ctx.scale(COMPOSITE_SCALE, COMPOSITE_SCALE);
       ctx.translate(-W / 2, -H / 2);
 
+      stepHeatmap();
       stepScanPath(ts);
       stepGaze();
       stepSaccade(ts);
