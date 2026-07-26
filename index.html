@@ -192,6 +192,20 @@
     z-index: 0;
   }
 
+  #sceneA-gridOverlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, rgba(255,0,0,0.10) 0.5px, transparent 0.5px),
+      linear-gradient(to bottom, rgba(255,0,0,0.10) 0.5px, transparent 0.5px);
+    background-size: calc(100vh / 6) calc(100vh / 6);
+    background-position: 50vw 50vh;
+    background-repeat: repeat;
+    background-color: rgba(0,0,0,0.05);
+  }
+
   #dotsLayer {
     position: absolute;
     inset: 0;
@@ -771,6 +785,7 @@
     <video id="bgVideo" autoplay muted loop playsinline>
       <source src="sky.mp4" type="video/mp4">
     </video>
+    <div id="sceneA-gridOverlay"></div>
     <div id="dotsLayer"></div>
   </div>
 </div>
