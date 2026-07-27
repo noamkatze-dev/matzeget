@@ -154,9 +154,29 @@
     display: block;
   }
 
+  #stageViewport {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    overflow: hidden;
+  }
+
+  #stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    transform-origin: center center;
+    background: #000;
+    flex-shrink: 0;
+  }
+
   .scene {
     display: none;
-    position: fixed;
+    position: absolute;
     inset: 0;
     align-items: center;
     justify-content: center;
@@ -654,6 +674,9 @@
 </head>
 <body>
 
+<div id="stageViewport">
+<div id="stage">
+
 <!-- SCENE SPLASH -->
 <div id="sceneSplash" class="scene">
   <div id="splashScreen">
@@ -794,7 +817,7 @@
 <div id="sceneB" class="scene"></div>
 
 <!-- SCENE C -->
-<div id="sceneC" class="scene" style="position:fixed;">
+<div id="sceneC" class="scene">
   <canvas id="sceneC-dotCanvas"></canvas>
   <div id="sceneC-annLayer"></div>
   <div id="sceneC-gazeDot"></div>
@@ -809,6 +832,9 @@
   <canvas id="sceneD-anaC" width="160" height="90" style="display:none"></canvas>
   <canvas id="sceneD-preC" width="160" height="90" style="display:none"></canvas>
   <canvas id="sceneD-aoiC" width="320" height="180" style="display:none"></canvas>
+</div>
+
+</div>
 </div>
 
 <script>
@@ -1156,6 +1182,12 @@
   (function () {
     'use strict';
 
+    /* ── מידות הבמה הקבועות (1920x1080) — משתמשים בהן במקום
+       window.innerWidth/innerHeight כי הסצנה רצה כעת בתוך במה
+       בגודל קבוע שמוקטנת/מוגדלת ויזואלית בהתאם לחלון האמיתי ── */
+    const STAGE_W = 1920;
+    const STAGE_H = 1080;
+
     /* ── CONSTANTS — זהה למקור ── */
     const W_ANA       = 160;
     const H_ANA       = 90;
@@ -1211,8 +1243,8 @@
     }
 
     function sizeOverlays() {
-      dotCanvas.width  = window.innerWidth;
-      dotCanvas.height = window.innerHeight;
+      dotCanvas.width  = STAGE_W;
+      dotCanvas.height = STAGE_H;
     }
 
     function sobel(px, w, h) {
@@ -1377,7 +1409,7 @@
             const sy = renderOffY + p.ny * renderH;
             a.el.style.left = sx + 'px';
             a.el.style.top  = sy + 'px';
-            a.el.style.transform = (sx / window.innerWidth) > 0.62
+            a.el.style.transform = (sx / STAGE_W) > 0.62
               ? 'translate(calc(-100% - 12px), -50%)'
               : 'translate(12px, -50%)';
           }
@@ -1406,7 +1438,7 @@
       sGX += (rawGX - sGX) * GAZE_LERP;
       sGY += (rawGY - sGY) * GAZE_LERP;
 
-      const W = window.innerWidth, H = window.innerHeight;
+      const W = STAGE_W, H = STAGE_H;
       const gpx = sGX * W, gpy = sGY * H;
 
       gazeDot.style.left = gpx + 'px';
@@ -1466,7 +1498,7 @@
       };
 
       p.setup = function() {
-        const cnv = p.createCanvas(window.innerWidth, window.innerHeight);
+        const cnv = p.createCanvas(STAGE_W, STAGE_H);
         cnv.class('p5-video-canvas');
         cnv.parent('sceneC');
 
@@ -1483,7 +1515,7 @@
         buildPool();
         sizeOverlays();
         window.addEventListener('resize', () => {
-          p.resizeCanvas(window.innerWidth, window.innerHeight);
+          p.resizeCanvas(STAGE_W, STAGE_H);
           sizeOverlays();
         });
 
@@ -3000,6 +3032,24 @@
     };
 
     window.addEventListener('resize', () => { if (running) resizeCanvas(); });
+  })();
+
+  // ═══════════════════════════════════════════════════════════════
+  // STAGE SCALING — כל הפריימים בגודל קבוע 1920x1080, וממורכזים
+  // ומוקטנים/מוגדלים (letterbox) כדי להתאים לגודל החלון האמיתי
+  // ═══════════════════════════════════════════════════════════════
+  (function () {
+    'use strict';
+    const STAGE_W = 1920, STAGE_H = 1080;
+    const stage = document.getElementById('stage');
+
+    function applyStageScale() {
+      const scale = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+      stage.style.transform = `scale(${scale})`;
+    }
+
+    applyStageScale();
+    window.addEventListener('resize', applyStageScale);
   })();
 
   // ═══════════════════════════════════════════════════════════════
