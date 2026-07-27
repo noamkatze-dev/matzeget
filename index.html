@@ -3044,7 +3044,11 @@
     const stage = document.getElementById('stage');
 
     function applyStageScale() {
-      const scale = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+      // "cover" ולא "contain": הבמה תמיד ממלאת את כל החלון בלי פסים
+      // ריקים, גם אם זה אומר לחתוך מעט מהקצוות כשהיחס של החלון שונה
+      // מ-16:9 - כך זה תמיד נראה בדיוק כמו העיצוב המקורי, רק בגודל
+      // שמתאים את עצמו לכל מסך.
+      const scale = Math.max(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
       stage.style.transform = `scale(${scale})`;
     }
 
