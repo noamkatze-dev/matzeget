@@ -38,7 +38,7 @@
   }
 
   /* ── SCENE SPLASH: מסך פתיחה עם וידאו + גריד נתונים + לוגו ── */
-  :root{ --grid-cell: 180px; }
+  :root{ --grid-cell: calc(100vh / 6); }
 
   #splashScreen {
     position: relative;
@@ -69,8 +69,8 @@
     background-image:
       linear-gradient(to right, rgba(255,0,0,0.10) 0.5px, transparent 0.5px),
       linear-gradient(to bottom, rgba(255,0,0,0.10) 0.5px, transparent 0.5px);
-    background-size: 180px 180px;
-    background-position: 960px 540px;
+    background-size: calc(100vh / 6) calc(100vh / 6);
+    background-position: 50vw 50vh;
     background-repeat: repeat;
     background-color: rgba(0,0,0,0.05);
   }
@@ -148,35 +148,15 @@
     justify-content: center;
   }
   #splashText svg {
-    width: 1900px;
-    max-width: 1900px;
+    width: calc(100vw - 20px);
+    max-width: calc(100vw - 20px);
     height: auto;
     display: block;
   }
 
-  #stageViewport {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #000;
-    overflow: hidden;
-  }
-
-  #stage {
-    position: relative;
-    width: 1920px;
-    height: 1080px;
-    overflow: hidden;
-    transform-origin: center center;
-    background: #000;
-    flex-shrink: 0;
-  }
-
   .scene {
     display: none;
-    position: absolute;
+    position: fixed;
     inset: 0;
     align-items: center;
     justify-content: center;
@@ -220,8 +200,8 @@
     background-image:
       linear-gradient(to right, rgba(255,0,0,0.10) 0.5px, transparent 0.5px),
       linear-gradient(to bottom, rgba(255,0,0,0.10) 0.5px, transparent 0.5px);
-    background-size: 180px 180px;
-    background-position: 960px 540px;
+    background-size: calc(100vh / 6) calc(100vh / 6);
+    background-position: 50vw 50vh;
     background-repeat: repeat;
     background-color: rgba(0,0,0,0.05);
   }
@@ -440,8 +420,8 @@
     background-image:
       linear-gradient(to right, rgba(255,0,0,0.10) 0.5px, transparent 0.5px),
       linear-gradient(to bottom, rgba(255,0,0,0.10) 0.5px, transparent 0.5px);
-    background-size: 180px 180px;
-    background-position: 960px 540px;
+    background-size: calc(100vh / 6) calc(100vh / 6);
+    background-position: 50vw 50vh;
     background-repeat: repeat;
     background-color: rgba(0,0,0,0.05);
   }
@@ -674,9 +654,6 @@
 </head>
 <body>
 
-<div id="stageViewport">
-<div id="stage">
-
 <!-- SCENE SPLASH -->
 <div id="sceneSplash" class="scene">
   <div id="splashScreen">
@@ -817,7 +794,7 @@
 <div id="sceneB" class="scene"></div>
 
 <!-- SCENE C -->
-<div id="sceneC" class="scene">
+<div id="sceneC" class="scene" style="position:fixed;">
   <canvas id="sceneC-dotCanvas"></canvas>
   <div id="sceneC-annLayer"></div>
   <div id="sceneC-gazeDot"></div>
@@ -832,9 +809,6 @@
   <canvas id="sceneD-anaC" width="160" height="90" style="display:none"></canvas>
   <canvas id="sceneD-preC" width="160" height="90" style="display:none"></canvas>
   <canvas id="sceneD-aoiC" width="320" height="180" style="display:none"></canvas>
-</div>
-
-</div>
 </div>
 
 <script>
@@ -1182,12 +1156,6 @@
   (function () {
     'use strict';
 
-    /* ── מידות הבמה הקבועות (1920x1080) — משתמשים בהן במקום
-       window.innerWidth/innerHeight כי הסצנה רצה כעת בתוך במה
-       בגודל קבוע שמוקטנת/מוגדלת ויזואלית בהתאם לחלון האמיתי ── */
-    const STAGE_W = 1920;
-    const STAGE_H = 1080;
-
     /* ── CONSTANTS — זהה למקור ── */
     const W_ANA       = 160;
     const H_ANA       = 90;
@@ -1243,8 +1211,8 @@
     }
 
     function sizeOverlays() {
-      dotCanvas.width  = STAGE_W;
-      dotCanvas.height = STAGE_H;
+      dotCanvas.width  = window.innerWidth;
+      dotCanvas.height = window.innerHeight;
     }
 
     function sobel(px, w, h) {
@@ -1409,7 +1377,7 @@
             const sy = renderOffY + p.ny * renderH;
             a.el.style.left = sx + 'px';
             a.el.style.top  = sy + 'px';
-            a.el.style.transform = (sx / STAGE_W) > 0.62
+            a.el.style.transform = (sx / window.innerWidth) > 0.62
               ? 'translate(calc(-100% - 12px), -50%)'
               : 'translate(12px, -50%)';
           }
@@ -1438,7 +1406,7 @@
       sGX += (rawGX - sGX) * GAZE_LERP;
       sGY += (rawGY - sGY) * GAZE_LERP;
 
-      const W = STAGE_W, H = STAGE_H;
+      const W = window.innerWidth, H = window.innerHeight;
       const gpx = sGX * W, gpy = sGY * H;
 
       gazeDot.style.left = gpx + 'px';
@@ -1498,7 +1466,7 @@
       };
 
       p.setup = function() {
-        const cnv = p.createCanvas(STAGE_W, STAGE_H);
+        const cnv = p.createCanvas(window.innerWidth, window.innerHeight);
         cnv.class('p5-video-canvas');
         cnv.parent('sceneC');
 
@@ -1515,7 +1483,7 @@
         buildPool();
         sizeOverlays();
         window.addEventListener('resize', () => {
-          p.resizeCanvas(STAGE_W, STAGE_H);
+          p.resizeCanvas(window.innerWidth, window.innerHeight);
           sizeOverlays();
         });
 
@@ -3032,28 +3000,6 @@
     };
 
     window.addEventListener('resize', () => { if (running) resizeCanvas(); });
-  })();
-
-  // ═══════════════════════════════════════════════════════════════
-  // STAGE SCALING — כל הפריימים בגודל קבוע 1920x1080, וממורכזים
-  // ומוקטנים/מוגדלים (letterbox) כדי להתאים לגודל החלון האמיתי
-  // ═══════════════════════════════════════════════════════════════
-  (function () {
-    'use strict';
-    const STAGE_W = 1920, STAGE_H = 1080;
-    const stage = document.getElementById('stage');
-
-    function applyStageScale() {
-      // "cover" ולא "contain": הבמה תמיד ממלאת את כל החלון בלי פסים
-      // ריקים, גם אם זה אומר לחתוך מעט מהקצוות כשהיחס של החלון שונה
-      // מ-16:9 - כך זה תמיד נראה בדיוק כמו העיצוב המקורי, רק בגודל
-      // שמתאים את עצמו לכל מסך.
-      const scale = Math.max(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
-      stage.style.transform = `scale(${scale})`;
-    }
-
-    applyStageScale();
-    window.addEventListener('resize', applyStageScale);
   })();
 
   // ═══════════════════════════════════════════════════════════════
