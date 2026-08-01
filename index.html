@@ -37,19 +37,8 @@
     font-family: 'Ratzif22', sans-serif;
   }
 
-  #stage {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 1920px;
-    height: 1080px;
-    background: #000;
-    transform-origin: center center;
-    overflow: hidden;
-  }
-
   /* ── SCENE SPLASH: מסך פתיחה עם וידאו + גריד נתונים + לוגו ── */
-  :root{ --grid-cell: calc(100% / 6); }
+  :root{ --grid-cell: calc(100vh / 6); }
 
   #splashScreen {
     position: relative;
@@ -80,8 +69,8 @@
     background-image:
       linear-gradient(to right, rgba(255,0,0,0.10) 0.5px, transparent 0.5px),
       linear-gradient(to bottom, rgba(255,0,0,0.10) 0.5px, transparent 0.5px);
-    background-size: calc(100% / 6) calc(100% / 6);
-    background-position: 50% 50%;
+    background-size: calc(100vh / 6) calc(100vh / 6);
+    background-position: 50vw 50vh;
     background-repeat: repeat;
     background-color: rgba(0,0,0,0.05);
   }
@@ -159,18 +148,16 @@
     justify-content: center;
   }
   #splashText svg {
-    width: calc(100% - 20px);
-    max-width: calc(100% - 20px);
+    width: calc(100vw - 20px);
+    max-width: calc(100vw - 20px);
     height: auto;
     display: block;
   }
 
   .scene {
     display: none;
-    position: absolute;
+    position: fixed;
     inset: 0;
-    width: 100%;
-    height: 100%;
     align-items: center;
     justify-content: center;
   }
@@ -213,8 +200,8 @@
     background-image:
       linear-gradient(to right, rgba(255,0,0,0.10) 0.5px, transparent 0.5px),
       linear-gradient(to bottom, rgba(255,0,0,0.10) 0.5px, transparent 0.5px);
-    background-size: calc(100% / 6) calc(100% / 6);
-    background-position: 50% 50%;
+    background-size: calc(100vh / 6) calc(100vh / 6);
+    background-position: 50vw 50vh;
     background-repeat: repeat;
     background-color: rgba(0,0,0,0.05);
   }
@@ -433,8 +420,8 @@
     background-image:
       linear-gradient(to right, rgba(255,0,0,0.10) 0.5px, transparent 0.5px),
       linear-gradient(to bottom, rgba(255,0,0,0.10) 0.5px, transparent 0.5px);
-    background-size: calc(100% / 6) calc(100% / 6);
-    background-position: 50% 50%;
+    background-size: calc(100vh / 6) calc(100vh / 6);
+    background-position: 50vw 50vh;
     background-repeat: repeat;
     background-color: rgba(0,0,0,0.05);
   }
@@ -738,8 +725,6 @@
 </head>
 <body>
 
-<div id="stage">
-
 <!-- SCENE SPLASH -->
 <div id="sceneSplash" class="scene">
   <div id="splashScreen">
@@ -887,7 +872,7 @@
 <div id="sceneB" class="scene"></div>
 
 <!-- SCENE C -->
-<div id="sceneC" class="scene">
+<div id="sceneC" class="scene" style="position:fixed;">
   <canvas id="sceneC-dotCanvas"></canvas>
   <div id="sceneC-annLayer"></div>
   <div id="sceneC-gazeDot"></div>
@@ -903,8 +888,6 @@
   <canvas id="sceneD-preC" width="160" height="90" style="display:none"></canvas>
   <canvas id="sceneD-aoiC" width="320" height="180" style="display:none"></canvas>
 </div>
-
-</div><!-- /#stage -->
 
 <script>
   // ═══════════════════════════════════════════════════════════════
@@ -1306,8 +1289,8 @@
     }
 
     function sizeOverlays() {
-      dotCanvas.width  = 1920;
-      dotCanvas.height = 1080;
+      dotCanvas.width  = window.innerWidth;
+      dotCanvas.height = window.innerHeight;
     }
 
     function sobel(px, w, h) {
@@ -1472,7 +1455,7 @@
             const sy = renderOffY + p.ny * renderH;
             a.el.style.left = sx + 'px';
             a.el.style.top  = sy + 'px';
-            a.el.style.transform = (sx / 1920) > 0.62
+            a.el.style.transform = (sx / window.innerWidth) > 0.62
               ? 'translate(calc(-100% - 12px), -50%)'
               : 'translate(12px, -50%)';
           }
@@ -1501,7 +1484,7 @@
       sGX += (rawGX - sGX) * GAZE_LERP;
       sGY += (rawGY - sGY) * GAZE_LERP;
 
-      const W = 1920, H = 1080;
+      const W = window.innerWidth, H = window.innerHeight;
       const gpx = sGX * W, gpy = sGY * H;
 
       gazeDot.style.left = gpx + 'px';
@@ -1561,7 +1544,7 @@
       };
 
       p.setup = function() {
-        const cnv = p.createCanvas(1920, 1080);
+        const cnv = p.createCanvas(window.innerWidth, window.innerHeight);
         cnv.class('p5-video-canvas');
         cnv.parent('sceneC');
 
@@ -1577,6 +1560,10 @@
 
         buildPool();
         sizeOverlays();
+        window.addEventListener('resize', () => {
+          p.resizeCanvas(window.innerWidth, window.innerHeight);
+          sizeOverlays();
+        });
 
         requestAnimationFrame(mainLoop);
       };
@@ -3365,18 +3352,6 @@
       if (scenes[current].id === 'sceneShowcase' && window.__sceneShowcase_start) window.__sceneShowcase_start();
       if (scenes[current].id === 'sceneDataWhite' && window.__sceneDataWhite_build) window.__sceneDataWhite_build();
     });
-  })();
-</script>
-
-<script>
-  (function () {
-    var stage = document.getElementById('stage');
-    function fitStage() {
-      var scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
-      stage.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
-    }
-    window.addEventListener('resize', fitStage);
-    fitStage();
   })();
 </script>
 
