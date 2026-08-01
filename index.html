@@ -568,6 +568,77 @@
     font-weight: 700;
     color: #FF0000;
   }
+  /* ── SCENE SHOWCASE STATIC: אותם שישה מצבי ניתוח, בלי תמונה,
+     על רקע לבן, וללא אנימציה (מצב סופי סטטי) ── */
+  #sceneShowcaseStatic {
+    background: #ffffff;
+    overflow-y: auto;
+    align-items: safe center;
+  }
+
+  #sceneShowcaseStatic-wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px 60px;
+    width: 100%;
+  }
+
+  #sceneShowcaseStatic-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .sceneShowcaseStatic-panel {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #eee;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+  }
+
+  .sceneShowcaseStatic-panel-canvas-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background: #ffffff;
+    overflow: hidden;
+  }
+
+  .sceneShowcaseStatic-panel-canvas-wrap canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+  }
+
+  .sceneShowcaseStatic-panel-label {
+    padding: 12px 14px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .sceneShowcaseStatic-panel-num {
+    font-family: 'HaimClassicBold', 'Ratzif22', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: #FF0000;
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+
+  .sceneShowcaseStatic-panel-name {
+    font-family: 'HaimClassicBold', 'Ratzif22', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: #FF0000;
+  }
+
   /* ── SCENE DATA WHITE: כל הנתונים הויזואליים מפוזרים על רקע לבן ── */
   #sceneDataWhite {
     background: #ffffff;
@@ -772,6 +843,13 @@
     <p id="spectrumNote">
       זוהי פרשנות אמנותית וקונספטואלית בלבד - לא כלי מדעי, לא מדידה מדויקת, והמיקום על הקשת אינו נשמר בשום מקום.
     </p>
+  </div>
+</div>
+
+<!-- SCENE SHOWCASE STATIC -->
+<div id="sceneShowcaseStatic" class="scene">
+  <div id="sceneShowcaseStatic-wrap">
+    <div id="sceneShowcaseStatic-grid"></div>
   </div>
 </div>
 
@@ -2310,6 +2388,244 @@
   })();
 
   // ═══════════════════════════════════════════════════════════════
+  // SCENE SHOWCASE STATIC — אותם שישה מצבי ניתוח, בלי תמונה, על רקע
+  // לבן, וכל פאנל מצויר פעם אחת במצב הסופי שלו (ללא אנימציה).
+  // ═══════════════════════════════════════════════════════════════
+  (function () {
+    'use strict';
+
+    const RED = '#FF0000';
+    const FONT_FAMILY = 'HaimClassicBold';
+
+    const MODES = [
+      { name:'מבט',           num:'01 / 06', draw:'drawGaze'     },
+      { name:'קיבוע',          num:'02 / 06', draw:'drawFixation' },
+      { name:'סקאדה',          num:'03 / 06', draw:'drawSaccade'  },
+      { name:'מסלול סריקה',    num:'04 / 06', draw:'drawScanPath' },
+      { name:'מפת חום',        num:'05 / 06', draw:'drawHeatmap'  },
+      { name:'קיבוע ראשון',    num:'06 / 06', draw:'drawFirstFix' },
+    ];
+
+    // ── דוגמת נתונים - זהה לזו שבסצנת Showcase ──
+    const gazeLog=[
+      {x:0.35,y:0.45},{x:0.34,y:0.46},{x:0.36,y:0.44},
+      {x:0.52,y:0.22},{x:0.51,y:0.23},{x:0.53,y:0.21},
+      {x:0.74,y:0.50},{x:0.73,y:0.51},{x:0.75,y:0.49},
+      {x:0.36,y:0.68},{x:0.35,y:0.69},{x:0.37,y:0.67},
+      {x:0.61,y:0.78},{x:0.60,y:0.79},{x:0.62,y:0.77},
+      {x:0.28,y:0.48},{x:0.50,y:0.50},{x:0.65,y:0.35}
+    ];
+    const fixHist=[
+      {x:0.35,y:0.45,duration:380},
+      {x:0.52,y:0.22,duration:260},
+      {x:0.74,y:0.50,duration:500},
+      {x:0.36,y:0.68,duration:180},
+      {x:0.61,y:0.78,duration:320}
+    ];
+    const sacHist=[
+      {fromX:0.35,fromY:0.45,toX:0.52,toY:0.22},
+      {fromX:0.52,fromY:0.22,toX:0.74,toY:0.50},
+      {fromX:0.74,fromY:0.50,toX:0.36,toY:0.68},
+      {fromX:0.36,fromY:0.68,toX:0.61,toY:0.78}
+    ];
+
+    // ── בניית ה-DOM: 6 פאנלים, כל אחד עם canvas בלבד (בלי תמונה) ──
+    const grid = document.getElementById('sceneShowcaseStatic-grid');
+    const panels = [];
+
+    MODES.forEach((mode) => {
+      const panel = document.createElement('div');
+      panel.className = 'sceneShowcaseStatic-panel';
+      panel.innerHTML = `
+        <div class="sceneShowcaseStatic-panel-canvas-wrap">
+          <canvas></canvas>
+        </div>
+        <div class="sceneShowcaseStatic-panel-label">
+          <span class="sceneShowcaseStatic-panel-name">${mode.name}</span>
+          <span class="sceneShowcaseStatic-panel-num">${mode.num}</span>
+        </div>
+      `;
+      grid.appendChild(panel);
+      panels.push({ canvas: panel.querySelector('canvas'), mode });
+    });
+
+    function drawArrow(ctx, fx, fy, tx, ty) {
+      ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(tx, ty); ctx.stroke();
+      const a = Math.atan2(ty - fy, tx - fx), l = 10;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(tx - l * Math.cos(a - Math.PI / 6), ty - l * Math.sin(a - Math.PI / 6));
+      ctx.lineTo(tx - l * Math.cos(a + Math.PI / 6), ty - l * Math.sin(a + Math.PI / 6));
+      ctx.closePath(); ctx.fillStyle = RED; ctx.fill();
+    }
+
+    function setupCanvas(canvas) {
+      const dpr = window.devicePixelRatio || 1;
+      const W = canvas.parentElement.offsetWidth || 300;
+      const H = canvas.parentElement.offsetHeight || 220;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      const ctx = canvas.getContext('2d', { alpha: true });
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { ctx, W, H };
+    }
+
+    function maxR(W, H, duration) { return Math.min(8 + duration / 60, Math.min(W, H) * 0.22); }
+
+    // ── 01 מבט: כל נקודות הדוגמה, מצב סופי ──
+    function drawGaze(ctx, W, H) {
+      for (const p of gazeLog) {
+        ctx.beginPath(); ctx.arc(p.x * W, p.y * H, 3, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,0,0,0.85)'; ctx.fill();
+      }
+    }
+
+    // ── 02 קיבוע: כל הקיבועים מלאים, כולל תווית משך ──
+    function drawFixation(ctx, W, H) {
+      for (const fix of fixHist) {
+        const cx = fix.x * W, cy = fix.y * H, r = maxR(W, H, fix.duration);
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,0,0,0.15)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.strokeStyle = RED; ctx.lineWidth = 2; ctx.stroke();
+
+        const numStr = String(Math.round(fix.duration));
+        const unitStr = 'ms';
+        const numFont = `700 10px ${FONT_FAMILY}`;
+        const unitFont = `700 10px HaimVariable`;
+        ctx.fillStyle = RED;
+        ctx.textBaseline = 'alphabetic';
+        ctx.font = numFont;
+        const numW = ctx.measureText(numStr).width;
+        ctx.font = unitFont;
+        const unitW = ctx.measureText(unitStr).width;
+        const startX = cx - (numW + unitW) / 2, y = cy + r + 13;
+        ctx.textAlign = 'left';
+        ctx.font = numFont;
+        ctx.fillText(numStr, startX, y);
+        ctx.font = unitFont;
+        ctx.fillText(unitStr, startX + numW, y);
+      }
+    }
+
+    // ── 03 סקאדה: כל החיצים מלאים ──
+    function drawSaccade(ctx, W, H) {
+      ctx.strokeStyle = RED; ctx.lineWidth = 2;
+      for (const sc of sacHist) {
+        drawArrow(ctx, sc.fromX * W, sc.fromY * H, sc.toX * W, sc.toY * H);
+      }
+    }
+
+    // ── 04 מסלול סריקה: כל הצמתים הממוספרים + קווים מקווקווים ──
+    function drawScanPath(ctx, W, H) {
+      const NODE_R = 14, count = fixHist.length;
+      ctx.save(); ctx.setLineDash([4, 7]);
+      ctx.strokeStyle = RED; ctx.lineWidth = 2;
+      for (let j = 0; j < count - 1; j++) {
+        const a = fixHist[j], b = fixHist[j + 1];
+        const ax = a.x * W, ay = a.y * H, bx = b.x * W, by = b.y * H;
+        const dx = bx - ax, dy = by - ay, dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 1) continue;
+        const ux = dx / dist, uy = dy / dist;
+        ctx.beginPath(); ctx.moveTo(ax + ux * NODE_R, ay + uy * NODE_R);
+        ctx.lineTo(bx - ux * NODE_R, by - uy * NODE_R); ctx.stroke();
+      }
+      ctx.setLineDash([]); ctx.restore();
+      for (let j = 0; j < count; j++) {
+        const p = fixHist[j], cx = p.x * W, cy = p.y * H;
+        ctx.beginPath(); ctx.arc(cx, cy, NODE_R, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,0,0,0.15)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, NODE_R, 0, Math.PI * 2);
+        ctx.strokeStyle = RED; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = RED; ctx.font = `700 11px ${FONT_FAMILY}`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(j + 1, cx, cy);
+      }
+    }
+
+    function getMSSegs(idx, T, R, B, L) {
+      switch (idx) {
+        case 1: return [[L, B]]; case 2: return [[R, B]]; case 3: return [[L, R]];
+        case 4: return [[T, R]]; case 5: return [[T, R], [L, B]]; case 6: return [[T, B]];
+        case 7: return [[T, L]]; case 8: return [[T, L]]; case 9: return [[T, B]];
+        case 10: return [[L, T], [R, B]]; case 11: return [[T, R]]; case 12: return [[L, R]];
+        case 13: return [[R, B]]; case 14: return [[L, B]]; default: return [];
+      }
+    }
+
+    // ── 05 מפת חום: כל הנקודות כבר צבורות, קווי מתאר סופיים ──
+    function drawHeatmap(ctx, W, H) {
+      const hmW = 60, hmH = 36, hm = new Float32Array(hmW * hmH);
+      const sigma = 0.10 * Math.max(hmW, hmH), r = Math.ceil(3 * sigma), inv2 = 1 / (2 * sigma * sigma);
+      function addPoint(p) {
+        const gx = p.x * hmW, gy = p.y * hmH;
+        const x0 = Math.max(0, Math.floor(gx - r)), x1 = Math.min(hmW - 1, Math.ceil(gx + r));
+        const y0 = Math.max(0, Math.floor(gy - r)), y1 = Math.min(hmH - 1, Math.ceil(gy + r));
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++)
+          hm[y * hmW + x] += 0.22 * Math.exp(-((x - gx) ** 2 + (y - gy) ** 2) * inv2);
+      }
+      for (let rep = 0; rep < 3; rep++) for (const p of gazeLog) addPoint(p);
+
+      let maxVal = 0; for (let i = 0; i < hm.length; i++) if (hm[i] > maxVal) maxVal = hm[i];
+      if (maxVal < 0.01) return;
+      const M = 4, levels = [0.15, 0.30, 0.50, 0.70, 0.88];
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      for (const level of levels) {
+        ctx.strokeStyle = `rgba(255,0,0,${Math.min(1, 0.35 + level * 0.65).toFixed(2)})`;
+        ctx.lineWidth = 2; ctx.beginPath();
+        for (let cy2 = 0; cy2 < hmH - 1; cy2++) for (let cx2 = 0; cx2 < hmW - 1; cx2++) {
+          const vTL = hm[cy2 * hmW + cx2] / maxVal, vTR = hm[cy2 * hmW + (cx2 + 1)] / maxVal;
+          const vBR = hm[(cy2 + 1) * hmW + (cx2 + 1)] / maxVal, vBL = hm[(cy2 + 1) * hmW + cx2] / maxVal;
+          const idx2 = (vTL >= level ? 8 : 0) + (vTR >= level ? 4 : 0) + (vBR >= level ? 2 : 0) + (vBL >= level ? 1 : 0);
+          if (idx2 === 0 || idx2 === 15) continue;
+          const sx0 = M + cx2 * (W - 2 * M) / hmW, sx1 = M + (cx2 + 1) * (W - 2 * M) / hmW;
+          const sy0 = M + cy2 * (H - 2 * M) / hmH, sy1 = M + (cy2 + 1) * (H - 2 * M) / hmH;
+          const lp = (v0, v1) => Math.abs(v1 - v0) < 1e-10 ? 0.5 : Math.max(0, Math.min(1, (level - v0) / (v1 - v0)));
+          const T2 = [sx0 + lp(vTL, vTR) * (sx1 - sx0), sy0], R2 = [sx1, sy0 + lp(vTR, vBR) * (sy1 - sy0)];
+          const B2 = [sx0 + lp(vBL, vBR) * (sx1 - sx0), sy1], L2 = [sx0, sy0 + lp(vTL, vBL) * (sy1 - sy0)];
+          for (const [p1, p2] of getMSSegs(idx2, T2, R2, B2, L2)) {
+            ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]);
+          }
+        }
+        ctx.stroke();
+      }
+    }
+
+    // ── 06 קיבוע ראשון: נקודה קבועה + תווית, בלי הבזק/פעימה ──
+    function drawFirstFix(ctx, W, H) {
+      const fix = fixHist[0], cx = fix.x * W, cy = fix.y * H;
+      ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+      ctx.fillStyle = RED; ctx.fill();
+      ctx.fillStyle = RED; ctx.font = `700 10px HaimVariable`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText('First fixation', cx, cy - 24);
+    }
+
+    const DRAWERS = { drawGaze, drawFixation, drawSaccade, drawScanPath, drawHeatmap, drawFirstFix };
+
+    function drawAllStatic() {
+      panels.forEach(p => {
+        const { ctx, W, H } = setupCanvas(p.canvas);
+        ctx.clearRect(0, 0, W, H);
+        DRAWERS[p.mode.draw](ctx, W, H);
+      });
+    }
+
+    document.fonts.ready.then(() => { setTimeout(drawAllStatic, 100); });
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(drawAllStatic, 200);
+    });
+
+    // חושף החוצה כדי שמנגנון החלפת הסצנות יוכל למדוד מחדש ולצייר
+    // ברגע שהסצנה הזו נהיית גלויה בפועל (ולא כשהיא עדיין מוסתרת
+    // עם רוחב/גובה אפס).
+    window.__sceneShowcaseStatic_build = drawAllStatic;
+  })();
+
+  // ═══════════════════════════════════════════════════════════════
   // SCENE SHOWCASE — שישה מצבי ניתוח (gaze/fixation/saccade/...) על תמונה אחת
   // ═══════════════════════════════════════════════════════════════
   (function () {
@@ -3028,6 +3344,7 @@
       document.getElementById('sceneSplash'),
       document.getElementById('sceneSession'),
       document.getElementById('sceneSpectrum'),
+      document.getElementById('sceneShowcaseStatic'),
       document.getElementById('sceneShowcase'),
       document.getElementById('sceneDataWhite')
     ];
@@ -3044,6 +3361,7 @@
       if (scenes[current].id === 'sceneD' && window.__sceneD_updateGaps) window.__sceneD_updateGaps();
       if (scenes[current].id === 'sceneSession' && window.__sceneSession_resize) window.__sceneSession_resize();
       if (scenes[current].id === 'sceneSpectrum' && window.__sceneSpectrum_place) window.__sceneSpectrum_place();
+      if (scenes[current].id === 'sceneShowcaseStatic' && window.__sceneShowcaseStatic_build) window.__sceneShowcaseStatic_build();
       if (scenes[current].id === 'sceneShowcase' && window.__sceneShowcase_start) window.__sceneShowcase_start();
       if (scenes[current].id === 'sceneDataWhite' && window.__sceneDataWhite_build) window.__sceneDataWhite_build();
     });
